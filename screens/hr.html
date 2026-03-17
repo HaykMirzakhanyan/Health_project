@@ -726,15 +726,33 @@
         const memberAppts = apptsByStaff[member.id] || [];
         const shiftHours = 12; // all shifts are 12hr
 
+        // Live burnout estimate based on hours + chronic factors (mirrors schedule.html logic)
+        const hoursToday = sched.hoursWorkedToday || 0;
+        const liveRisk = (() => {
+          let score = 0;
+          if (hoursToday >= 10) score += 3;
+          else if (hoursToday >= 8) score += 2;
+          else if (hoursToday >= 6) score += 1;
+          if ((member.nightShiftRatio || 0) >= 0.7) score += 2;
+          else if ((member.nightShiftRatio || 0) >= 0.4) score += 1;
+          if ((member.daysSinceLastPTO || 0) >= 60) score += 2;
+          else if ((member.daysSinceLastPTO || 0) >= 30) score += 1;
+          if ((member.wellnessScore || 3) <= 2) score += 2;
+          else if ((member.wellnessScore || 3) <= 3) score += 1;
+          if ((member.shiftsLast14Days || 0) >= 9) score += 2;
+          else if ((member.shiftsLast14Days || 0) >= 7) score += 1;
+          return score >= 5 ? 'red' : score >= 2 ? 'yellow' : 'green';
+        })();
+
         doctorInfo[member.name] = {
           staffId:     member.id,
           unit:        member.unit,
-          time:        sched.hoursWorkedToday || 0,
+          time:        hoursToday,
           specialty:   `${member.role} — ${member.unit}`,
           shiftStart:  fmt12h(sched.shiftStart),
           shiftEnd:    fmt12h(sched.shiftEnd),
           shiftHours,
-          burnoutRisk: member.burnoutRisk,
+          burnoutRisk: member.burnoutRisk || liveRisk,
           // Rich appointment objects for the detail panel
           appointments: memberAppts.map(a => ({
             patient: a.patientName,

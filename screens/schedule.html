@@ -430,21 +430,68 @@
   }
 
   function hoursBar(hours) {
-    const pct = Math.min((hours / 12) * 100, 100);
-    const cls = hours >= 10 ? 'danger' : hours >= 8 ? 'warn' : '';
-    return `
-      <span class="hours-bar-wrap">
-        <span class="hours-bar ${cls}" style="width:${pct}%"></span>
-      </span>
-      <strong style="color:${hours >= 10 ? '#e74c3c' : hours >= 8 ? '#e67e22' : '#27ae60'}">
-        ${hours.toFixed(1)} hrs
-      </strong>`;
+    const pct = (hours / 12) * 100;
+    const color = pct < 25 ? '#27ae60' : pct <= 75 ? '#d4a017' : '#e74c3c';
+    return `<strong style="color:${color};">${hours.toFixed(1)} hrs</strong>`;
   }
 
-  function riskDot(risk) {
-    const colors = { green: '#27ae60', yellow: '#f1c40f', red: '#e74c3c' };
-    const color = colors[risk] || '#ccc';
-    return `<span class="risk-dot" style="background:${color}"></span>${risk || '—'}`;
+  /**
+   * Dynamically scores burnout risk using today's hours plus chronic factors.
+   * Returns { level: 'green'|'yellow'|'red', factors: string[] }
+   */
+  function calcLiveRisk(hoursToday, member) {
+    const factors = [];
+    let score = 0;
+
+    // ── Today's hours (most immediate signal) ──
+    if (hoursToday >= 10) {
+      score += 3;
+      factors.push(`${hoursToday.toFixed(1)} hrs worked today`);
+    } else if (hoursToday >= 8) {
+      score += 2;
+      factors.push(`${hoursToday.toFixed(1)} hrs worked today`);
+    } else if (hoursToday >= 6) {
+      score += 1;
+    }
+
+    // ── Night shift ratio (chronic fatigue) ──
+    const nightPct = Math.round((member.nightShiftRatio || 0) * 100);
+    if (nightPct >= 70) { score += 2; factors.push(`${nightPct}% night shifts`); }
+    else if (nightPct >= 40) { score += 1; factors.push(`${nightPct}% night shifts`); }
+
+    // ── Days since last PTO ──
+    const pto = member.daysSinceLastPTO || 0;
+    if (pto >= 60) { score += 2; factors.push(`${pto} days without PTO`); }
+    else if (pto >= 30) { score += 1; factors.push(`${pto} days without PTO`); }
+
+    // ── Wellness check-in score (1–5, lower = worse) ──
+    const wellness = member.wellnessScore || 3;
+    if (wellness <= 2) { score += 2; factors.push(`Wellness ${wellness}/5`); }
+    else if (wellness <= 3) { score += 1; }
+
+    // ── Shifts in last 14 days ──
+    const shifts14 = member.shiftsLast14Days || 0;
+    if (shifts14 >= 9) { score += 2; factors.push(`${shifts14} shifts in 14 days`); }
+    else if (shifts14 >= 7) { score += 1; factors.push(`${shifts14} shifts in 14 days`); }
+
+    const level = score >= 5 ? 'red' : score >= 2 ? 'yellow' : 'green';
+    return { level, factors };
+  }
+
+  function riskCell(hoursToday, member) {
+    // If agent hasn't run yet, fall back to live calculation from staff metrics
+    const agentRisk = member.burnoutRisk;
+    const { level, factors } = calcLiveRisk(hoursToday, member);
+    const displayLevel = agentRisk || level;
+    const colors = { green: '#27ae60', yellow: '#d4a017', red: '#e74c3c' };
+    const color  = colors[displayLevel] || '#aaa';
+    const label  = displayLevel.charAt(0).toUpperCase() + displayLevel.slice(1);
+    const source = agentRisk ? 'AI scored' : 'Live estimate';
+    const tip    = factors.length ? factors.join(' · ') : 'No risk factors';
+    return `
+      <span class="risk-dot" style="background:${color};"></span>
+      <span style="color:${color};font-weight:bold;">${label}</span>
+      <br><span style="font-size:10px;color:#888;line-height:1.4;">${source} · ${tip}</span>`;
   }
 
   function renderSchedule() {
@@ -464,14 +511,15 @@
 
     tbody.innerHTML = filtered.map(entry => {
       const member = staffMap[entry.staffId] || {};
+      const hours  = entry.hoursWorkedToday || 0;
       return `
         <tr>
           <td>${entry.staffName || member.name || '—'}</td>
           <td>${entry.role || member.role || '—'}</td>
           <td>${entry.unit}</td>
           <td>${shiftBadge(entry.shiftType, entry.status)} <span style="font-size:11px;color:#888;">${entry.shiftStart || ''}–${entry.shiftEnd || ''}</span></td>
-          <td>${hoursBar(entry.hoursWorkedToday || 0)}</td>
-          <td>${riskDot(member.burnoutRisk)}</td>
+          <td>${hoursBar(hours)}</td>
+          <td style="line-height:1.6;">${riskCell(hours, member)}</td>
         </tr>`;
     }).join('');
   }

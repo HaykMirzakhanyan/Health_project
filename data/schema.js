@@ -30,7 +30,7 @@ function createStaffMember(overrides = {}) {
     nightShiftRatio: 0,         // 0–1 fraction of shifts that were night shifts
     daysSinceLastPTO: 0,
     wellnessScore: 3,           // 1–5 from weekly check-in (5 = best)
-    burnoutRisk: 'green',       // green | yellow | red
+    burnoutRisk: null,          // null until Agent 3 runs; green | yellow | red
     ...overrides,
   };
 }

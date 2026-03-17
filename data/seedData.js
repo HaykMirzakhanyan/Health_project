@@ -26,264 +26,111 @@ const {
 const UNITS = ['ICU-1', 'ICU-2', 'MedSurg-3'];
 
 // ---------------------------------------------------------------------------
-// Staff definitions
-// Deliberately include several high-burnout demo profiles:
-//   - Maria Santos   (RN, ICU-1)  — 10 night shifts in 14 days, no PTO 70 days
-//   - James Okafor  (RN, ICU-2)  — 9 night shifts, wellness 1
-//   - Linda Patel   (NP, ICU-1)  — 8 nights, 65 days since PTO
+// Random metric generators
+// ---------------------------------------------------------------------------
+
+/** Integer in [min, max] inclusive */
+function randInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+/** Float rounded to 2 decimal places in [0, 1] */
+function randRatio() {
+  return Math.round(Math.random() * 100) / 100;
+}
+
+/**
+ * Derives a wellness score (1–5) from workload factors.
+ * Starts at 5 and deducts points based on stress indicators:
+ *   - High night shift ratio  → fatigue & circadian disruption
+ *   - Many days without PTO   → chronic exhaustion & no recovery time
+ *   - Many shifts in 14 days  → overwork in the immediate term
+ *   - High hours in 30 days   → sustained overload
+ * A small random ±1 wobble adds individual variation.
+ */
+function calcWellness(shifts14, hours30, nightRatio, ptoDays) {
+  let score = 5;
+
+  // Night shift ratio — circadian disruption
+  if (nightRatio >= 0.75) score -= 2;
+  else if (nightRatio >= 0.5)  score -= 1;
+  else if (nightRatio >= 0.25) score -= 0.5;
+
+  // Days without PTO — recovery deficit
+  if (ptoDays >= 180) score -= 2;
+  else if (ptoDays >= 90)  score -= 1.5;
+  else if (ptoDays >= 45)  score -= 1;
+  else if (ptoDays >= 20)  score -= 0.5;
+
+  // Shifts in last 14 days — short-term overwork
+  if (shifts14 >= 12) score -= 1.5;
+  else if (shifts14 >= 10) score -= 1;
+  else if (shifts14 >= 8)  score -= 0.5;
+
+  // Hours in last 30 days — sustained load
+  if (hours30 >= 280) score -= 1;
+  else if (hours30 >= 200) score -= 0.5;
+
+  // Individual variation ±1 (weighted toward centre)
+  const wobble = [-1, 0, 0, 0, 1][randInt(0, 4)];
+  score += wobble;
+
+  return Math.max(1, Math.min(5, Math.round(score)));
+}
+
+/**
+ * Generates a full set of randomised workload metrics for one staff member.
+ * Fields match the ranges specified in the project spec.
+ */
+function randomMetrics() {
+  const shiftsLast14Days  = randInt(0, 14);
+  const hoursLast30Days   = randInt(0, 30 * 12);          // 0–360
+  const nightShiftRatio   = randRatio();                   // 0.00–1.00
+  const daysSinceLastPTO  = randInt(1, 365);
+  const wellnessScore     = calcWellness(
+    shiftsLast14Days, hoursLast30Days, nightShiftRatio, daysSinceLastPTO
+  );
+  return { shiftsLast14Days, hoursLast30Days, nightShiftRatio, daysSinceLastPTO, wellnessScore };
+}
+
+// ---------------------------------------------------------------------------
+// Staff definitions — identity only (name, role, unit, certifications).
+// All workload metrics are generated at runtime by randomMetrics().
 // ---------------------------------------------------------------------------
 const staffDefinitions = [
   // --- ICU-1 ---
-  {
-    name: 'Maria Santos',
-    role: 'RN',
-    unit: 'ICU-1',
-    certifications: ['ACLS', 'CCRN'],
-    shiftsLast14Days: 10,
-    hoursLast30Days: 240,
-    nightShiftRatio: 0.9,
-    daysSinceLastPTO: 70,
-    wellnessScore: 1,
-    burnoutRisk: 'red',
-  },
-  {
-    name: 'Linda Patel',
-    role: 'NP',
-    unit: 'ICU-1',
-    certifications: ['ACLS', 'CCRN', 'FNP'],
-    shiftsLast14Days: 9,
-    hoursLast30Days: 220,
-    nightShiftRatio: 0.78,
-    daysSinceLastPTO: 65,
-    wellnessScore: 2,
-    burnoutRisk: 'red',
-  },
-  {
-    name: 'Derek Nguyen',
-    role: 'RN',
-    unit: 'ICU-1',
-    certifications: ['ACLS', 'BLS'],
-    shiftsLast14Days: 7,
-    hoursLast30Days: 180,
-    nightShiftRatio: 0.43,
-    daysSinceLastPTO: 30,
-    wellnessScore: 3,
-    burnoutRisk: 'yellow',
-  },
-  {
-    name: 'Aisha Kowalski',
-    role: 'CNA',
-    unit: 'ICU-1',
-    certifications: ['BLS'],
-    shiftsLast14Days: 6,
-    hoursLast30Days: 160,
-    nightShiftRatio: 0.17,
-    daysSinceLastPTO: 10,
-    wellnessScore: 4,
-    burnoutRisk: 'green',
-  },
-  {
-    name: 'Dr. Samuel Rivera',
-    role: 'MD',
-    unit: 'ICU-1',
-    certifications: ['ACLS', 'Critical Care Board'],
-    shiftsLast14Days: 6,
-    hoursLast30Days: 168,
-    nightShiftRatio: 0.33,
-    daysSinceLastPTO: 20,
-    wellnessScore: 4,
-    burnoutRisk: 'green',
-  },
-  {
-    name: 'Priya Mehta',
-    role: 'RN',
-    unit: 'ICU-1',
-    certifications: ['ACLS', 'CCRN'],
-    shiftsLast14Days: 5,
-    hoursLast30Days: 140,
-    nightShiftRatio: 0.2,
-    daysSinceLastPTO: 5,
-    wellnessScore: 5,
-    burnoutRisk: 'green',
-  },
+  { name: 'Maria Santos',     role: 'RN',  unit: 'ICU-1',     certifications: ['ACLS', 'CCRN'] },
+  { name: 'Linda Patel',      role: 'NP',  unit: 'ICU-1',     certifications: ['ACLS', 'CCRN', 'FNP'] },
+  { name: 'Derek Nguyen',     role: 'RN',  unit: 'ICU-1',     certifications: ['ACLS', 'BLS'] },
+  { name: 'Aisha Kowalski',   role: 'CNA', unit: 'ICU-1',     certifications: ['BLS'] },
+  { name: 'Dr. Samuel Rivera',role: 'MD',  unit: 'ICU-1',     certifications: ['ACLS', 'Critical Care Board'] },
+  { name: 'Priya Mehta',      role: 'RN',  unit: 'ICU-1',     certifications: ['ACLS', 'CCRN'] },
 
   // --- ICU-2 ---
-  {
-    name: 'James Okafor',
-    role: 'RN',
-    unit: 'ICU-2',
-    certifications: ['ACLS', 'CCRN'],
-    shiftsLast14Days: 9,
-    hoursLast30Days: 230,
-    nightShiftRatio: 0.89,
-    daysSinceLastPTO: 58,
-    wellnessScore: 1,
-    burnoutRisk: 'red',
-  },
-  {
-    name: 'Fatima Al-Rashid',
-    role: 'RN',
-    unit: 'ICU-2',
-    certifications: ['ACLS', 'BLS'],
-    shiftsLast14Days: 8,
-    hoursLast30Days: 200,
-    nightShiftRatio: 0.5,
-    daysSinceLastPTO: 45,
-    wellnessScore: 2,
-    burnoutRisk: 'yellow',
-  },
-  {
-    name: 'Dr. Chen Wei',
-    role: 'MD',
-    unit: 'ICU-2',
-    certifications: ['ACLS', 'Critical Care Board', 'Pulmonary Fellowship'],
-    shiftsLast14Days: 7,
-    hoursLast30Days: 175,
-    nightShiftRatio: 0.43,
-    daysSinceLastPTO: 35,
-    wellnessScore: 3,
-    burnoutRisk: 'yellow',
-  },
-  {
-    name: 'Rosa Martinez',
-    role: 'CNA',
-    unit: 'ICU-2',
-    certifications: ['BLS'],
-    shiftsLast14Days: 5,
-    hoursLast30Days: 130,
-    nightShiftRatio: 0.2,
-    daysSinceLastPTO: 7,
-    wellnessScore: 5,
-    burnoutRisk: 'green',
-  },
-  {
-    name: 'Kevin Tremblay',
-    role: 'RN',
-    unit: 'ICU-2',
-    certifications: ['ACLS', 'CCRN'],
-    shiftsLast14Days: 6,
-    hoursLast30Days: 156,
-    nightShiftRatio: 0.33,
-    daysSinceLastPTO: 14,
-    wellnessScore: 4,
-    burnoutRisk: 'green',
-  },
-  {
-    name: 'Nadia Volkov',
-    role: 'NP',
-    unit: 'ICU-2',
-    certifications: ['ACLS', 'AGPCNP'],
-    shiftsLast14Days: 6,
-    hoursLast30Days: 150,
-    nightShiftRatio: 0.17,
-    daysSinceLastPTO: 21,
-    wellnessScore: 4,
-    burnoutRisk: 'green',
-  },
+  { name: 'James Okafor',     role: 'RN',  unit: 'ICU-2',     certifications: ['ACLS', 'CCRN'] },
+  { name: 'Fatima Al-Rashid', role: 'RN',  unit: 'ICU-2',     certifications: ['ACLS', 'BLS'] },
+  { name: 'Dr. Chen Wei',     role: 'MD',  unit: 'ICU-2',     certifications: ['ACLS', 'Critical Care Board', 'Pulmonary Fellowship'] },
+  { name: 'Rosa Martinez',    role: 'CNA', unit: 'ICU-2',     certifications: ['BLS'] },
+  { name: 'Kevin Tremblay',   role: 'RN',  unit: 'ICU-2',     certifications: ['ACLS', 'CCRN'] },
+  { name: 'Nadia Volkov',     role: 'NP',  unit: 'ICU-2',     certifications: ['ACLS', 'AGPCNP'] },
 
   // --- MedSurg-3 ---
-  {
-    name: 'Tamara Johnson',
-    role: 'RN',
-    unit: 'MedSurg-3',
-    certifications: ['BLS', 'Med-Surg Cert'],
-    shiftsLast14Days: 8,
-    hoursLast30Days: 192,
-    nightShiftRatio: 0.63,
-    daysSinceLastPTO: 50,
-    wellnessScore: 2,
-    burnoutRisk: 'yellow',
-  },
-  {
-    name: 'Oliver Hayes',
-    role: 'RN',
-    unit: 'MedSurg-3',
-    certifications: ['BLS', 'ACLS'],
-    shiftsLast14Days: 7,
-    hoursLast30Days: 178,
-    nightShiftRatio: 0.43,
-    daysSinceLastPTO: 28,
-    wellnessScore: 3,
-    burnoutRisk: 'yellow',
-  },
-  {
-    name: 'Dr. Anjali Singh',
-    role: 'MD',
-    unit: 'MedSurg-3',
-    certifications: ['ACLS', 'Hospitalist Board'],
-    shiftsLast14Days: 6,
-    hoursLast30Days: 160,
-    nightShiftRatio: 0.17,
-    daysSinceLastPTO: 12,
-    wellnessScore: 4,
-    burnoutRisk: 'green',
-  },
-  {
-    name: 'Marcus Bell',
-    role: 'CNA',
-    unit: 'MedSurg-3',
-    certifications: ['BLS'],
-    shiftsLast14Days: 5,
-    hoursLast30Days: 120,
-    nightShiftRatio: 0.0,
-    daysSinceLastPTO: 4,
-    wellnessScore: 5,
-    burnoutRisk: 'green',
-  },
-  {
-    name: 'Yuki Tanaka',
-    role: 'RN',
-    unit: 'MedSurg-3',
-    certifications: ['BLS', 'Med-Surg Cert'],
-    shiftsLast14Days: 5,
-    hoursLast30Days: 130,
-    nightShiftRatio: 0.2,
-    daysSinceLastPTO: 8,
-    wellnessScore: 5,
-    burnoutRisk: 'green',
-  },
-  {
-    name: 'Bethany Cross',
-    role: 'CNA',
-    unit: 'MedSurg-3',
-    certifications: ['BLS'],
-    shiftsLast14Days: 4,
-    hoursLast30Days: 100,
-    nightShiftRatio: 0.0,
-    daysSinceLastPTO: 2,
-    wellnessScore: 5,
-    burnoutRisk: 'green',
-  },
-  {
-    name: 'Carlos Espinoza',
-    role: 'RN',
-    unit: 'MedSurg-3',
-    certifications: ['BLS', 'ACLS'],
-    shiftsLast14Days: 6,
-    hoursLast30Days: 150,
-    nightShiftRatio: 0.33,
-    daysSinceLastPTO: 18,
-    wellnessScore: 4,
-    burnoutRisk: 'green',
-  },
-  {
-    name: 'Patricia Lee',
-    role: 'NP',
-    unit: 'MedSurg-3',
-    certifications: ['ACLS', 'FNP', 'Med-Surg Cert'],
-    shiftsLast14Days: 5,
-    hoursLast30Days: 140,
-    nightShiftRatio: 0.2,
-    daysSinceLastPTO: 15,
-    wellnessScore: 4,
-    burnoutRisk: 'green',
-  },
+  { name: 'Tamara Johnson',   role: 'RN',  unit: 'MedSurg-3', certifications: ['BLS', 'Med-Surg Cert'] },
+  { name: 'Oliver Hayes',     role: 'RN',  unit: 'MedSurg-3', certifications: ['BLS', 'ACLS'] },
+  { name: 'Dr. Anjali Singh', role: 'MD',  unit: 'MedSurg-3', certifications: ['ACLS', 'Hospitalist Board'] },
+  { name: 'Marcus Bell',      role: 'CNA', unit: 'MedSurg-3', certifications: ['BLS'] },
+  { name: 'Yuki Tanaka',      role: 'RN',  unit: 'MedSurg-3', certifications: ['BLS', 'Med-Surg Cert'] },
+  { name: 'Bethany Cross',    role: 'CNA', unit: 'MedSurg-3', certifications: ['BLS'] },
+  { name: 'Carlos Espinoza', role: 'RN',  unit: 'MedSurg-3', certifications: ['BLS', 'ACLS'] },
+  { name: 'Patricia Lee',     role: 'NP',  unit: 'MedSurg-3', certifications: ['ACLS', 'FNP', 'Med-Surg Cert'] },
 ];
 
 // ---------------------------------------------------------------------------
-// Build staff members array with stable IDs so shifts can reference them
+// Build staff members — merge identity with randomised metrics
 // ---------------------------------------------------------------------------
-const seedStaff = staffDefinitions.map((def) => createStaffMember(def));
+const seedStaff = staffDefinitions.map((def) =>
+  createStaffMember({ ...def, ...randomMetrics() })
+);
 
 // ---------------------------------------------------------------------------
 // Generate 30 days of historical shift data per staff member
