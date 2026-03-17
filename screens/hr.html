@@ -38,6 +38,22 @@
     font-weight: bold;
   }
 
+  .logout-btn {
+    margin-left: auto;
+    padding: 6px 14px;
+    background: transparent;
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.5);
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .logout-btn:hover {
+    background: rgba(255,255,255,0.15);
+  }
+
   /* MAIN LAYOUT */
   .layout {
     display: grid;
@@ -247,25 +263,19 @@
 <div class="top-bar">
   <div class="gear">⚙</div>
   <div class="title">HR Dashboard</div>
+  <a href="/screens/schedule.html" style="margin-left:16px;padding:5px 12px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.35);color:#fff;border-radius:6px;font-size:13px;cursor:pointer;text-decoration:none;">📅 Schedule & Forecast</a>
+  <button class="logout-btn" onclick="logout()">Logout</button>
 </div>
 
 <div class="layout">
 
   <!-- LEFT SIDE: TIRED DOCTORS ONLY (>8 HRS) -->
   <div class="left-panel" id="leftPanel">
-    <h1>Tired Doctors</h1>
+    <h1>Tired Staff</h1>
 
     <div class="wheel-container">
       <ul class="wheel-list" id="doctorList">
-        <!-- Only tired doctors (time > 8) -->
-        <li class="wheel-item">Dr. Brown</li>
-        <li class="wheel-item">Dr. Davis</li>
-        <li class="wheel-item">Dr. Nguyen</li>
-        <li class="wheel-item">Dr. Hernandez</li>
-        <li class="wheel-item">Dr. Howard</li>
-        <li class="wheel-item">Dr. Irving</li>
-        <li class="wheel-item">Dr. King</li>
-        <li class="wheel-item">Dr. Lopez</li>
+        <!-- Populated by API -->
       </ul>
     </div>
   </div>
@@ -308,7 +318,7 @@
 
 <script>
   const wheel = document.querySelector('.wheel-container');
-  const items = document.querySelectorAll('.wheel-item');
+  let items = [];
   const leftPanel = document.getElementById('leftPanel');
   const detailPanel = document.getElementById('detailPanel');
   const allDoctorsList = document.getElementById('allDoctorsList');
@@ -321,249 +331,8 @@
   const modalWorkedHours = document.getElementById('modalWorkedHours');
   const closeModalBtn = document.getElementById('closeModalBtn');
 
-  /* DOCTOR DATA:
-     time = hours worked today
-     shiftStart / shiftEnd = scheduled shift
-     shiftHours = total scheduled hours
-     times = [ [patient, start, end], ... ]
-  */
-  const doctorInfo = {
-    "Dr. Smith": {
-      time: 6,
-      specialty: "General Medicine",
-      shiftStart: "8:00 AM",
-      shiftEnd: "4:00 PM",
-      shiftHours: 8,
-      times: [
-        ["Alice","9:00 AM","9:30 AM"],
-        ["Bob","11:30 AM","12:00 PM"],
-        ["Carol","2:00 PM","2:30 PM"]
-      ]
-    },
-    "Dr. Johnson": {
-      time: 4,
-      specialty: "Cardiology",
-      shiftStart: "10:00 AM",
-      shiftEnd: "6:00 PM",
-      shiftHours: 8,
-      times: [
-        ["David","10:00 AM","10:30 AM"],
-        ["Emma","1:00 PM","1:30 PM"]
-      ]
-    },
-    "Dr. Patel": {
-      time: 7,
-      specialty: "Neurology",
-      shiftStart: "7:00 AM",
-      shiftEnd: "3:00 PM",
-      shiftHours: 8,
-      times: [
-        ["Frank","8:30 AM","9:00 AM"]
-      ]
-    },
-    "Dr. Lee": {
-      time: 2,
-      specialty: "Pediatrics",
-      shiftStart: "9:00 AM",
-      shiftEnd: "5:00 PM",
-      shiftHours: 8,
-      times: [
-        ["Grace","9:15 AM","9:45 AM"],
-        ["Henry","3:45 PM","4:15 PM"],
-        ["Ivy","4:30 PM","5:00 PM"]
-      ]
-    },
-    "Dr. Garcia": {
-      time: 5,
-      specialty: "Orthopedics",
-      shiftStart: "8:00 AM",
-      shiftEnd: "4:00 PM",
-      shiftHours: 8,
-      times: [
-        ["Jack","12:00 PM","12:30 PM"],
-        ["Karen","1:30 PM","2:00 PM"]
-      ]
-    },
-    "Dr. Brown": {
-      time: 9,
-      specialty: "Dermatology",
-      shiftStart: "10:00 AM",
-      shiftEnd: "8:00 PM",
-      shiftHours: 10,
-      times: [
-        ["Leo","2:00 PM","2:30 PM"]
-      ]
-    },
-    "Dr. Wilson": {
-      time: 3,
-      specialty: "Family Medicine",
-      shiftStart: "7:00 AM",
-      shiftEnd: "3:00 PM",
-      shiftHours: 8,
-      times: [
-        ["Mia","8:00 AM","8:30 AM"],
-        ["Noah","9:45 AM","10:15 AM"],
-        ["Olivia","11:00 AM","11:30 AM"]
-      ]
-    },
-    "Dr. Martinez": {
-      time: 8,
-      specialty: "Gastroenterology",
-      shiftStart: "9:00 AM",
-      shiftEnd: "5:00 PM",
-      shiftHours: 8,
-      times: [
-        ["Paul","3:00 PM","3:30 PM"]
-      ]
-    },
-    "Dr. Davis": {
-      time: 10,
-      specialty: "Endocrinology",
-      shiftStart: "7:00 AM",
-      shiftEnd: "5:00 PM",
-      shiftHours: 10,
-      times: []
-    },
-    "Dr. Thompson": {
-      time: 1,
-      specialty: "Pulmonology",
-      shiftStart: "10:00 AM",
-      shiftEnd: "6:00 PM",
-      shiftHours: 8,
-      times: [
-        ["Quinn","10:30 AM","11:00 AM"],
-        ["Rita","11:00 AM","11:30 AM"],
-        ["Sam","1:45 PM","2:15 PM"]
-      ]
-    },
-    "Dr. Nguyen": {
-      time: 11,
-      specialty: "Oncology",
-      shiftStart: "7:00 AM",
-      shiftEnd: "6:00 PM",
-      shiftHours: 11,
-      times: []
-    },
-    "Dr. Hernandez": {
-      time: 12,
-      specialty: "Rheumatology",
-      shiftStart: "6:00 AM",
-      shiftEnd: "6:00 PM",
-      shiftHours: 12,
-      times: [
-        ["Tom","4:00 PM","4:30 PM"]
-      ]
-    },
-    "Dr. Adams": {
-      time: 5,
-      specialty: "Urology",
-      shiftStart: "9:00 AM",
-      shiftEnd: "5:00 PM",
-      shiftHours: 8,
-      times: [
-        ["Uma","9:00 AM","9:30 AM"],
-        ["Victor","3:00 PM","3:30 PM"]
-      ]
-    },
-    "Dr. Brooks": {
-      time: 7,
-      specialty: "Nephrology",
-      shiftStart: "8:00 AM",
-      shiftEnd: "4:00 PM",
-      shiftHours: 8,
-      times: [
-        ["Wendy","8:00 AM","8:30 AM"]
-      ]
-    },
-    "Dr. Diaz": {
-      time: 6,
-      specialty: "Hematology",
-      shiftStart: "10:00 AM",
-      shiftEnd: "6:00 PM",
-      shiftHours: 8,
-      times: [
-        ["Xavier","11:00 AM","11:30 AM"]
-      ]
-    },
-    "Dr. Evans": {
-      time: 3,
-      specialty: "Allergy & Immunology",
-      shiftStart: "9:00 AM",
-      shiftEnd: "5:00 PM",
-      shiftHours: 8,
-      times: [
-        ["Yara","9:30 AM","10:00 AM"],
-        ["Zane","2:30 PM","3:00 PM"]
-      ]
-    },
-    "Dr. Foster": {
-      time: 8,
-      specialty: "Radiology",
-      shiftStart: "12:00 PM",
-      shiftEnd: "8:00 PM",
-      shiftHours: 8,
-      times: [
-        ["Amy","1:00 PM","1:30 PM"]
-      ]
-    },
-    "Dr. Green": {
-      time: 2,
-      specialty: "Psychiatry",
-      shiftStart: "10:00 AM",
-      shiftEnd: "6:00 PM",
-      shiftHours: 8,
-      times: [
-        ["Ben","3:15 PM","3:45 PM"]
-      ]
-    },
-    "Dr. Howard": {
-      time: 9,
-      specialty: "Surgery",
-      shiftStart: "6:00 AM",
-      shiftEnd: "4:00 PM",
-      shiftHours: 10,
-      times: [
-        ["Cara","7:00 AM","8:00 AM"],
-        ["Dan","12:00 PM","1:00 PM"]
-      ]
-    },
-    "Dr. Irving": {
-      time: 10,
-      specialty: "Pathology",
-      shiftStart: "8:00 AM",
-      shiftEnd: "6:00 PM",
-      shiftHours: 10,
-      times: []
-    },
-    "Dr. James": {
-      time: 1,
-      specialty: "Ophthalmology",
-      shiftStart: "9:00 AM",
-      shiftEnd: "5:00 PM",
-      shiftHours: 8,
-      times: [
-        ["Ella","11:45 AM","12:15 PM"]
-      ]
-    },
-    "Dr. King": {
-      time: 11,
-      specialty: "Infectious Disease",
-      shiftStart: "7:00 AM",
-      shiftEnd: "6:00 PM",
-      shiftHours: 11,
-      times: []
-    },
-    "Dr. Lopez": {
-      time: 12,
-      specialty: "Endocrinology",
-      shiftStart: "6:00 AM",
-      shiftEnd: "6:00 PM",
-      shiftHours: 12,
-      times: [
-        ["Finn","4:30 PM","5:00 PM"]
-      ]
-    }
-  };
+  /* DOCTOR DATA — populated from API on init */
+  let doctorInfo = {};
 
   function colorHours(hours) {
     const intensity = Math.min(hours / 12, 1);
@@ -695,7 +464,7 @@
     const center = wheel.scrollTop + wheel.clientHeight / 2;
 
     items.forEach(item => {
-      const name = item.textContent;
+      const name = item.textContent.trim();
       const info = doctorInfo[name];
       if (!info) return;
 
@@ -715,21 +484,6 @@
 
   wheel.addEventListener('scroll', updateWheel);
 
-  /* LEFT LIST CLICK: DETAIL + MODAL OPTION */
-  items.forEach(item => {
-    item.addEventListener('click', () => {
-      items.forEach(i => i.classList.remove('active'));
-      item.classList.add('active');
-      const name = item.textContent;
-      showDetailForDoctor(name);
-    });
-
-    item.addEventListener('dblclick', () => {
-      const name = item.textContent;
-      openShiftModal(name);
-    });
-  });
-
   /* CLICK OFF LEFT PANEL: HIDE DETAIL PANEL */
   document.addEventListener('click', (e) => {
     const clickedInsideLeft = leftPanel.contains(e.target);
@@ -741,10 +495,100 @@
     }
   });
 
-  /* INITIAL BUILD */
-  updateWheel();
-  buildAllDoctorsSummary();
-  buildAllAppointmentsSummary();
+  /* ── API INIT ─────────────────────────────────────────── */
+
+  function fmt12h(time24) {
+    if (!time24) return '—';
+    const [hStr, mStr] = time24.split(':');
+    let h = parseInt(hStr, 10);
+    const m = mStr || '00';
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return `${h}:${m} ${ampm}`;
+  }
+
+  async function init() {
+    try {
+      const [staffRes, scheduleRes, appointmentsRes] = await Promise.all([
+        fetch('/api/staff'),
+        fetch('/api/today-schedule'),
+        fetch('/api/appointments'),
+      ]);
+
+      const allStaff    = staffRes.ok        ? await staffRes.json()        : [];
+      const schedules   = scheduleRes.ok     ? await scheduleRes.json()     : [];
+      const appointments = appointmentsRes.ok ? await appointmentsRes.json() : [];
+
+      // Index schedules and appointments by staffId
+      const scheduleMap = {};
+      schedules.forEach(s => { scheduleMap[s.staffId] = s; });
+
+      const apptsByStaff = {};
+      appointments.forEach(a => {
+        if (!a.assignedStaffId) return;
+        if (!apptsByStaff[a.assignedStaffId]) apptsByStaff[a.assignedStaffId] = [];
+        apptsByStaff[a.assignedStaffId].push(a);
+      });
+
+      // Build doctorInfo from all staff
+      doctorInfo = {};
+      allStaff.forEach(member => {
+        const sched = scheduleMap[member.id] || {};
+        const memberAppts = apptsByStaff[member.id] || [];
+        const shiftHours = 12; // all shifts are 12hr
+
+        doctorInfo[member.name] = {
+          staffId:    member.id,
+          time:       sched.hoursWorkedToday || 0,
+          specialty:  `${member.role} — ${member.unit}`,
+          shiftStart: fmt12h(sched.shiftStart),
+          shiftEnd:   fmt12h(sched.shiftEnd),
+          shiftHours,
+          burnoutRisk: member.burnoutRisk,
+          times: memberAppts.map(a => [a.patientName, fmt12h(a.time), '—']),
+        };
+      });
+
+      // Build the tired staff wheel (hours > 8)
+      const tiredNames = Object.keys(doctorInfo).filter(
+        name => doctorInfo[name].time > 8
+      );
+
+      const doctorListEl = document.getElementById('doctorList');
+      doctorListEl.innerHTML = tiredNames.length
+        ? tiredNames.map(name => `<li class="wheel-item">${name}</li>`).join('')
+        : '<li class="wheel-item" style="opacity:0.5;cursor:default;">No staff over 8 hrs</li>';
+
+      // Re-bind items after building the list
+      items = document.querySelectorAll('.wheel-item');
+
+      // Attach click handlers
+      items.forEach(item => {
+        item.addEventListener('click', () => {
+          items.forEach(i => i.classList.remove('active'));
+          item.classList.add('active');
+          showDetailForDoctor(item.textContent.trim());
+        });
+        item.addEventListener('dblclick', () => {
+          openShiftModal(item.textContent.trim());
+        });
+      });
+
+      updateWheel();
+      buildAllDoctorsSummary();
+      buildAllAppointmentsSummary();
+
+    } catch (err) {
+      console.error('Failed to load HR dashboard:', err);
+    }
+  }
+
+  function logout() {
+    localStorage.removeItem('currentUser');
+    window.location.href = '/screens/Login.html';
+  }
+
+  init();
 </script>
 
 </body>

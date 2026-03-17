@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Schedule & AI Forecast</title>
+
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f5faff;
+    color: #333;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* TOP BAR */
+  .top-bar {
+    height: 50px;
+    background: #1f3b57;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 12px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  }
+
+  .top-bar .gear { font-size: 22px; }
+  .top-bar .title { font-size: 18px; font-weight: bold; }
+
+  .top-bar .nav-btn {
+    padding: 5px 12px;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.35);
+    color: #fff;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+  }
+  .top-bar .nav-btn:hover { background: rgba(255,255,255,0.25); }
+
+  .top-bar .logout-btn {
+    margin-left: auto;
+    padding: 6px 14px;
+    background: transparent;
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.5);
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .top-bar .logout-btn:hover { background: rgba(255,255,255,0.15); }
+
+  /* MAIN LAYOUT */
+  .layout {
+    display: grid;
+    grid-template-columns: 62% 38%;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* LEFT — SCHEDULE PANEL */
+  .left-panel {
+    background: white;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 4px 0 16px rgba(0,0,0,0.08);
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 14px 20px 10px;
+    border-bottom: 1px solid #dde8f5;
+    flex-shrink: 0;
+  }
+
+  .panel-header h2 {
+    margin: 0 0 10px;
+    font-size: 17px;
+    color: #1f3b57;
+  }
+
+  /* UNIT TABS */
+  .unit-tabs {
+    display: flex;
+    gap: 6px;
+  }
+
+  .tab-btn {
+    padding: 5px 14px;
+    border: 1px solid #b5c7d8;
+    background: #f0f6ff;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    color: #1f3b57;
+    transition: background 0.15s;
+  }
+  .tab-btn.active {
+    background: #1f3b57;
+    color: #fff;
+    border-color: #1f3b57;
+  }
+
+  /* SCHEDULE TABLE */
+  .schedule-scroll {
+    overflow-y: auto;
+    flex: 1;
+    padding: 14px 20px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+
+  thead th {
+    background: #1f3b57;
+    color: #fff;
+    padding: 9px 12px;
+    text-align: left;
+    font-weight: normal;
+    font-size: 13px;
+  }
+
+  tbody tr:nth-child(even) { background: #f5faff; }
+
+  tbody td {
+    padding: 9px 12px;
+    border-bottom: 1px solid #e8f0f8;
+    font-size: 13px;
+    vertical-align: middle;
+  }
+
+  .shift-badge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+  }
+  .shift-day     { background: #d4edda; color: #155724; }
+  .shift-evening { background: #fff3cd; color: #856404; }
+  .shift-night   { background: #d1ecf1; color: #0c5460; }
+  .shift-absent  { background: #f8d7da; color: #721c24; }
+
+  .hours-bar-wrap {
+    background: #e8f0f8;
+    border-radius: 8px;
+    height: 8px;
+    width: 80px;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  .hours-bar {
+    height: 100%;
+    border-radius: 8px;
+    background: #27ae60;
+  }
+  .hours-bar.warn  { background: #e67e22; }
+  .hours-bar.danger { background: #e74c3c; }
+
+  .risk-dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-right: 5px;
+    vertical-align: middle;
+  }
+
+  /* RIGHT — AI INSIGHTS PANEL */
+  .right-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 14px 16px;
+    gap: 14px;
+    overflow-y: auto;
+  }
+
+  /* RUN AI BUTTON */
+  .run-ai-btn {
+    width: 100%;
+    padding: 11px;
+    background: #1f3b57;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .run-ai-btn:hover   { background: #244766; }
+  .run-ai-btn:disabled { background: #7a99b5; cursor: not-allowed; }
+
+  .last-run-text {
+    font-size: 12px;
+    color: #6c8aa0;
+    text-align: center;
+    margin-top: -8px;
+  }
+
+  /* INSIGHT CARDS */
+  .card {
+    background: #e9f3ff;
+    border-radius: 12px;
+    padding: 13px 15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    flex-shrink: 0;
+  }
+
+  .card h3 {
+    margin: 0 0 10px;
+    font-size: 15px;
+    color: #1f3b57;
+  }
+
+  /* FORECAST ROWS */
+  .forecast-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid #c9dff0;
+    font-size: 13px;
+  }
+  .forecast-row:last-child { border-bottom: none; }
+
+  .forecast-row .unit-name { font-weight: bold; width: 80px; }
+  .forecast-row .stat      { text-align: center; flex: 1; }
+  .forecast-row .stat span { font-size: 11px; color: #6c8aa0; display: block; }
+
+  .gap-badge {
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: bold;
+  }
+  .gap-badge.gap     { background: #f8d7da; color: #721c24; }
+  .gap-badge.ok      { background: #d4edda; color: #155724; }
+  .gap-badge.pending { background: #e2e8ee; color: #666; }
+
+  /* INTERVENTIONS */
+  .intervention-item {
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: white;
+    margin-bottom: 7px;
+    border-left: 4px solid #ccc;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .intervention-item.critical { border-color: #e74c3c; }
+  .intervention-item.high     { border-color: #e67e22; }
+  .intervention-item.medium   { border-color: #f1c40f; }
+  .intervention-item.low      { border-color: #27ae60; }
+
+  .intervention-text { flex: 1; line-height: 1.4; }
+  .urgency-label {
+    font-size: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 8px;
+    white-space: nowrap;
+  }
+  .urgency-label.critical { background: #f8d7da; color: #721c24; }
+  .urgency-label.high     { background: #ffe5cc; color: #7a3500; }
+  .urgency-label.medium   { background: #fff3cd; color: #856404; }
+  .urgency-label.low      { background: #d4edda; color: #155724; }
+
+  .approve-btn {
+    margin-top: 5px;
+    padding: 3px 10px;
+    font-size: 12px;
+    background: #1f3b57;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  .approve-btn:disabled { background: #27ae60; cursor: default; }
+
+  .no-data { font-size: 13px; color: #999; font-style: italic; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .fade-in { animation: fadeIn 0.3s ease forwards; }
+
+  /* LOADING SPINNER */
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+
+<body>
+
+<div class="top-bar">
+  <div class="gear">⚙</div>
+  <div class="title">Schedule &amp; AI Forecast</div>
+  <a href="/screens/hr.html" class="nav-btn">← HR Dashboard</a>
+  <button class="logout-btn" onclick="logout()">Logout</button>
+</div>
+
+<div class="layout">
+
+  <!-- LEFT: SCHEDULE GRID -->
+  <div class="left-panel">
+    <div class="panel-header">
+      <h2>Today's Schedule</h2>
+      <div class="unit-tabs" id="unitTabs">
+        <button class="tab-btn active" onclick="switchUnit('all', this)">All Units</button>
+        <button class="tab-btn" onclick="switchUnit('ICU-1', this)">ICU-1</button>
+        <button class="tab-btn" onclick="switchUnit('ICU-2', this)">ICU-2</button>
+        <button class="tab-btn" onclick="switchUnit('MedSurg-3', this)">MedSurg-3</button>
+      </div>
+    </div>
+
+    <div class="schedule-scroll">
+      <table id="scheduleTable">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+            <th>Unit</th>
+            <th>Shift</th>
+            <th>Hours Today</th>
+            <th>Burnout Risk</th>
+          </tr>
+        </thead>
+        <tbody id="scheduleBody">
+          <tr><td colspan="6" class="no-data" style="padding:20px;">Loading schedule…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- RIGHT: AI INSIGHTS -->
+  <div class="right-panel">
+
+    <button class="run-ai-btn" id="runAiBtn" onclick="runAI()">
+      Run AI Analysis
+    </button>
+    <div class="last-run-text" id="lastRunText">Not yet run this session</div>
+
+    <!-- DEMAND FORECAST -->
+    <div class="card fade-in">
+      <h3>📊 Demand Forecast (Next 72 hrs)</h3>
+      <div id="forecastList">
+        <p class="no-data">Run AI Analysis to generate forecasts.</p>
+      </div>
+    </div>
+
+    <!-- STAFFING GAPS -->
+    <div class="card fade-in">
+      <h3>⚠️ Staffing Gaps</h3>
+      <div id="gapList">
+        <p class="no-data">Run AI Analysis to detect gaps.</p>
+      </div>
+    </div>
+
+    <!-- INTERVENTION RECOMMENDATIONS -->
+    <div class="card fade-in">
+      <h3>💡 AI Recommendations</h3>
+      <div id="interventionList">
+        <p class="no-data">Run AI Analysis to get recommendations.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const FATIGUE_THRESHOLD = 8;
+
+  let allSchedule = [];
+  let allStaff    = [];
+  let currentUnit = 'all';
+
+  // ── AUTH ─────────────────────────────────────────────────
+  function logout() {
+    localStorage.removeItem('currentUser');
+    window.location.href = '/screens/Login.html';
+  }
+
+  const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+  if (!currentUser) window.location.href = '/screens/Login.html';
+
+  // ── UNIT TAB SWITCH ────────────────────────────────────
+  function switchUnit(unit, btn) {
+    currentUnit = unit;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderSchedule();
+  }
+
+  // ── SCHEDULE TABLE ─────────────────────────────────────
+  function shiftBadge(type, status) {
+    if (status === 'absent') return '<span class="shift-badge shift-absent">Absent</span>';
+    const cls = { day: 'shift-day', evening: 'shift-evening', night: 'shift-night' }[type] || 'shift-day';
+    const label = type ? type.charAt(0).toUpperCase() + type.slice(1) : '—';
+    return `<span class="shift-badge ${cls}">${label}</span>`;
+  }
+
+  function hoursBar(hours) {
+    const pct = Math.min((hours / 12) * 100, 100);
+    const cls = hours >= 10 ? 'danger' : hours >= 8 ? 'warn' : '';
+    return `
+      <span class="hours-bar-wrap">
+        <span class="hours-bar ${cls}" style="width:${pct}%"></span>
+      </span>
+      <strong style="color:${hours >= 10 ? '#e74c3c' : hours >= 8 ? '#e67e22' : '#27ae60'}">
+        ${hours.toFixed(1)} hrs
+      </strong>`;
+  }
+
+  function riskDot(risk) {
+    const colors = { green: '#27ae60', yellow: '#f1c40f', red: '#e74c3c' };
+    const color = colors[risk] || '#ccc';
+    return `<span class="risk-dot" style="background:${color}"></span>${risk || '—'}`;
+  }
+
+  function renderSchedule() {
+    const filtered = currentUnit === 'all'
+      ? allSchedule
+      : allSchedule.filter(e => e.unit === currentUnit);
+
+    const staffMap = {};
+    allStaff.forEach(s => { staffMap[s.id] = s; });
+
+    const tbody = document.getElementById('scheduleBody');
+
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="no-data" style="padding:20px;">No schedule data.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(entry => {
+      const member = staffMap[entry.staffId] || {};
+      return `
+        <tr>
+          <td>${entry.staffName || member.name || '—'}</td>
+          <td>${entry.role || member.role || '—'}</td>
+          <td>${entry.unit}</td>
+          <td>${shiftBadge(entry.shiftType, entry.status)} <span style="font-size:11px;color:#888;">${entry.shiftStart || ''}–${entry.shiftEnd || ''}</span></td>
+          <td>${hoursBar(entry.hoursWorkedToday || 0)}</td>
+          <td>${riskDot(member.burnoutRisk)}</td>
+        </tr>`;
+    }).join('');
+  }
+
+  // ── FORECAST PANEL ──────────────────────────────────────
+  function renderForecasts(forecasts) {
+    const el = document.getElementById('forecastList');
+    if (!forecasts || !forecasts.length) {
+      el.innerHTML = '<p class="no-data">No forecast data returned.</p>';
+      return;
+    }
+
+    el.innerHTML = `
+      <div class="forecast-row" style="font-size:11px;color:#6c8aa0;font-weight:bold;padding-bottom:4px;">
+        <span style="width:80px;">Unit</span>
+        <span style="flex:1;text-align:center;">Date</span>
+        <span style="flex:1;text-align:center;">Census</span>
+        <span style="flex:1;text-align:center;">Required</span>
+        <span style="flex:1;text-align:center;">Scheduled</span>
+        <span style="flex:1;text-align:center;">Status</span>
+      </div>
+      ${forecasts.map(f => `
+        <div class="forecast-row">
+          <span class="unit-name">${f.unit}</span>
+          <span class="stat">${new Date(f.date).toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' })}</span>
+          <span class="stat">${f.predictedCensus}<span>patients</span></span>
+          <span class="stat">${f.requiredStaff}<span>needed</span></span>
+          <span class="stat">${f.scheduledStaff}<span>scheduled</span></span>
+          <span class="stat">
+            <span class="gap-badge ${f.gapFlag ? 'gap' : 'ok'}">${f.gapFlag ? '⚠ Gap' : '✓ OK'}</span>
+          </span>
+        </div>`).join('')}`;
+  }
+
+  // ── GAPS PANEL ──────────────────────────────────────────
+  function renderGaps(gaps) {
+    const el = document.getElementById('gapList');
+    if (!gaps || !gaps.length) {
+      el.innerHTML = '<p class="no-data" style="color:#27ae60;">✓ No staffing gaps detected.</p>';
+      return;
+    }
+
+    el.innerHTML = gaps.map(g => `
+      <div class="intervention-item critical" style="margin-bottom:7px;">
+        <div class="intervention-text">
+          <strong>${g.unit}</strong> — ${new Date(g.date).toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' })}
+          ${g.type ? ` (${g.type} shift)` : ''}<br>
+          <span style="color:#e74c3c;">Shortfall: ${g.shortfall || '?'} staff member${g.shortfall !== 1 ? 's' : ''}</span>
+        </div>
+        <span class="urgency-label critical">GAP</span>
+      </div>`).join('');
+  }
+
+  // ── INTERVENTIONS PANEL ─────────────────────────────────
+  function renderInterventions(interventions) {
+    const el = document.getElementById('interventionList');
+    if (!interventions || !interventions.length) {
+      el.innerHTML = '<p class="no-data">No recommendations yet.</p>';
+      return;
+    }
+
+    el.innerHTML = interventions.map(item => `
+      <div class="intervention-item ${item.urgency}" id="intervention-${item.id}">
+        <div class="intervention-text">
+          ${item.recommendation}
+          <br>
+          <button class="approve-btn" id="approve-${item.id}"
+            ${item.approved ? 'disabled' : ''}
+            onclick="approveIntervention('${item.id}')">
+            ${item.approved ? '✓ Approved' : 'Approve'}
+          </button>
+        </div>
+        <span class="urgency-label ${item.urgency}">${item.urgency}</span>
+      </div>`).join('');
+  }
+
+  // ── APPROVE INTERVENTION ────────────────────────────────
+  async function approveIntervention(id) {
+    try {
+      const res = await fetch(`/api/interventions/${id}/approve`, { method: 'POST' });
+      if (res.ok) {
+        const btn = document.getElementById(`approve-${id}`);
+        btn.textContent = '✓ Approved';
+        btn.disabled = true;
+      }
+    } catch (err) {
+      console.error('Approve failed:', err);
+    }
+  }
+
+  // ── RUN AI ANALYSIS ─────────────────────────────────────
+  async function runAI() {
+    const btn = document.getElementById('runAiBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Running AI Analysis…';
+
+    document.getElementById('forecastList').innerHTML    = '<p class="no-data">Generating forecasts…</p>';
+    document.getElementById('gapList').innerHTML         = '<p class="no-data">Detecting gaps…</p>';
+    document.getElementById('interventionList').innerHTML = '<p class="no-data">Building recommendations…</p>';
+
+    try {
+      const res  = await fetch('/api/orchestrator/run', { method: 'POST' });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || 'Orchestrator failed');
+
+      // Update last run time
+      const now = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('lastRunText').textContent = `Last run: ${now}`;
+
+      // Render results
+      renderForecasts(data.forecasts || []);
+      renderGaps(data.gaps || []);
+
+      // Fetch full interventions list (with IDs for approval)
+      const intRes = await fetch('/api/interventions');
+      const interventions = intRes.ok ? await intRes.json() : [];
+      renderInterventions(interventions);
+
+      // Refresh the schedule table with updated burnout data
+      const staffRes = await fetch('/api/staff');
+      if (staffRes.ok) allStaff = await staffRes.json();
+      renderSchedule();
+
+    } catch (err) {
+      document.getElementById('forecastList').innerHTML =
+        `<p class="no-data" style="color:#e74c3c;">Error: ${err.message}</p>`;
+      console.error(err);
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = 'Run AI Analysis';
+  }
+
+  // ── INITIAL LOAD ─────────────────────────────────────────
+  async function init() {
+    try {
+      const [schedRes, staffRes, forecastRes, interventionRes] = await Promise.all([
+        fetch('/api/today-schedule'),
+        fetch('/api/staff'),
+        fetch('/api/forecasts'),
+        fetch('/api/interventions'),
+      ]);
+
+      allSchedule = schedRes.ok  ? await schedRes.json()  : [];
+      allStaff    = staffRes.ok  ? await staffRes.json()  : [];
+
+      const forecasts     = forecastRes.ok      ? await forecastRes.json()      : [];
+      const interventions = interventionRes.ok   ? await interventionRes.json()  : [];
+
+      renderSchedule();
+
+      if (forecasts.length)     renderForecasts(forecasts);
+      if (interventions.length) renderInterventions(interventions);
+
+      // Check last run from server
+      const healthRes = await fetch('/api/health');
+      if (healthRes.ok) {
+        const health = await healthRes.json();
+        if (health.lastRun) {
+          const t = new Date(health.lastRun).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+          document.getElementById('lastRunText').textContent = `Last run: ${t}`;
+        }
+      }
+    } catch (err) {
+      console.error('Init failed:', err);
+    }
+  }
+
+  init();
+</script>
+
+</body>
+</html>

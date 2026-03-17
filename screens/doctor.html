@@ -36,6 +36,22 @@
     font-weight: bold;
   }
 
+  .logout-btn {
+    margin-left: auto;
+    padding: 6px 14px;
+    background: transparent;
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.5);
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .logout-btn:hover {
+    background: rgba(255,255,255,0.15);
+  }
+
   /* MAIN LAYOUT */
   .layout {
     display: grid;
@@ -177,6 +193,7 @@
 <div class="top-bar">
   <div class="gear">⚙</div>
   <div class="title">Doctor Dashboard</div>
+  <button class="logout-btn" onclick="logout()">Logout</button>
 </div>
 
 <div class="layout">
@@ -298,6 +315,163 @@
     document.querySelector('#hoursWorked').textContent = `Hours Worked: ${info.hours}`;
     document.querySelector('#hoursWorked').style.color = info.fatigueColor;
   }
+
+  /* ── API INIT ─────────────────────────────────────────── */
+
+  function fatigueColor(hours) {
+    if (hours >= 10) return '#e74c3c';
+    if (hours >= 8)  return '#e67e22';
+    return '#27ae60';
+  }
+
+  function calcAge(dob) {
+    if (!dob) return '—';
+    const diff = Date.now() - new Date(dob).getTime();
+    return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
+  }
+
+  function statusColor(status) {
+    if (status === 'completed')   return '#27ae60';
+    if (status === 'in_progress') return '#2980b9';
+    if (status === 'cancelled')   return '#e74c3c';
+    return '#e67e22'; // scheduled
+  }
+
+  async function init() {
+    // Read the logged-in user from localStorage
+    const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+    if (!currentUser) {
+      window.location.href = '/screens/Login.html';
+      return;
+    }
+
+    document.querySelector('.greeting').textContent = `Hello, ${currentUser.name.replace(/^Dr\.\s*/i, 'Dr. ')}`;
+
+    try {
+      // Fetch schedule entry, appointments, and patients in parallel
+      const [scheduleRes, appointmentsRes, patientsRes] = await Promise.all([
+        fetch(`/api/today-schedule/${currentUser.staffId}`),
+        fetch(`/api/appointments?staffId=${currentUser.staffId}`),
+        fetch('/api/patients'),
+      ]);
+
+      const scheduleEntry  = scheduleRes.ok  ? await scheduleRes.json()      : null;
+      const appointments   = appointmentsRes.ok ? await appointmentsRes.json() : [];
+      const patients       = patientsRes.ok  ? await patientsRes.json()      : [];
+
+      // Build a quick lookup map: patientId → patient
+      const patientMap = {};
+      patients.forEach(p => { patientMap[p.id] = p; });
+
+      // Populate doctor info card
+      const hours = scheduleEntry ? scheduleEntry.hoursWorkedToday : 0;
+      loadDoctorInfo({
+        name:         currentUser.name,
+        specialty:    currentUser.unit || currentUser.role,
+        shift:        scheduleEntry
+                        ? `${scheduleEntry.shiftStart} – ${scheduleEntry.shiftEnd}`
+                        : 'Not scheduled today',
+        hours:        `${hours} hrs`,
+        fatigueColor: fatigueColor(hours),
+      });
+
+      // Populate appointment list
+      loadAppointments(appointments.map(appt => {
+        const patient = patientMap[appt.patientId] || {};
+        return {
+          id:          appt.id,
+          patient:     appt.patientName,
+          age:         calcAge(patient.dob),
+          reason:      appt.type,
+          notes:       appt.notes || 'None',
+          time:        appt.time,
+          statusColor: statusColor(appt.status),
+        };
+      }));
+
+    } catch (err) {
+      console.error('Failed to load dashboard data:', err);
+    }
+  }
+
+  // Patch loadAppointments to include data-id so Mark Complete works
+  const _originalLoadAppointments = loadAppointments;
+  function loadAppointments(appointments) {
+    appointmentList.innerHTML = appointments.map(app => `
+      <li class="appointment-item"
+          data-id="${app.id || ''}"
+          data-patient="${app.patient}"
+          data-age="${app.age}"
+          data-reason="${app.reason}"
+          data-notes="${app.notes}"
+          data-time="${app.time}">
+        <span>
+          <span class="status-dot" style="background:${app.statusColor};"></span>
+          ${app.patient}
+        </span>
+        <span>${app.time}</span>
+      </li>
+    `).join('');
+
+    attachAppointmentEvents();
+    updateTilt();
+  }
+
+  // Patch attachAppointmentEvents to wire up Mark Complete
+  function attachAppointmentEvents() {
+    const items = document.querySelectorAll('.appointment-item');
+    items.forEach(item => {
+      item.addEventListener('click', () => {
+        items.forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+
+        const apptId = item.dataset.id;
+        const patient = item.dataset.patient;
+        const age     = item.dataset.age;
+        const reason  = item.dataset.reason;
+        const notes   = item.dataset.notes;
+        const time    = item.dataset.time;
+
+        detailPanel.innerHTML = `
+          <div class="detail-box">
+            <h3>${patient}</h3>
+            <p><strong>Age:</strong> ${age}</p>
+            <p><strong>Time:</strong> ${time}</p>
+            <p><strong>Reason:</strong> ${reason}</p>
+            <p><strong>Notes:</strong> ${notes}</p>
+            <button class="complete-btn" data-id="${apptId}">Mark Complete</button>
+          </div>
+        `;
+
+        const btn = detailPanel.querySelector('.complete-btn');
+        btn.addEventListener('click', async () => {
+          const id = btn.dataset.id;
+          if (!id) return;
+          try {
+            await fetch(`/api/appointments/${id}/status`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: 'completed' }),
+            });
+            btn.textContent = 'Completed ✓';
+            btn.disabled = true;
+            btn.style.background = '#27ae60';
+            // Update the dot color in the list
+            item.querySelector('.status-dot').style.background = '#27ae60';
+          } catch (err) {
+            console.error('Failed to mark complete:', err);
+          }
+        });
+      });
+    });
+  }
+
+  function logout() {
+    localStorage.removeItem('currentUser');
+    window.location.href = '/screens/Login.html';
+  }
+
+  init();
 </script>
 
 </body>

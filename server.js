@@ -43,31 +43,18 @@ app.use(express.json());
 loadSeed();
 
 // ---------------------------------------------------------------------------
+// Static files — serve the screens/ folder
+// ---------------------------------------------------------------------------
+app.use('/screens', express.static('screens'));
+
+// ---------------------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------------------
 app.use('/api', apiRouter);
 
-// Root redirect for convenience
+// Root redirect → login screen
 app.get('/', (req, res) => {
-  res.json({
-    name: 'Health Staff Scheduler API',
-    version: '1.0.0',
-    description: 'AI-powered staff scheduling and burnout monitoring for Riverside General.',
-    docs: 'See /api/health to confirm the service is running.',
-    endpoints: [
-      'GET  /api/health',
-      'POST /api/orchestrator/run',
-      'GET  /api/staff',
-      'GET  /api/staff/:id',
-      'GET  /api/forecasts',
-      'GET  /api/schedule',
-      'GET  /api/burnout',
-      'GET  /api/interventions',
-      'GET  /api/interventions/pending',
-      'POST /api/interventions/:id/approve',
-      'POST /api/checkin/:staffId',
-    ],
-  });
+  res.redirect('/screens/Login.html');
 });
 
 // 404 fallback for any unmatched route

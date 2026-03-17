@@ -102,23 +102,53 @@
   const password = document.getElementById('password');
   const errorMessage = document.getElementById('errorMessage');
 
-  loginBtn.addEventListener('click', () => {
+  loginBtn.addEventListener('click', async () => {
     const id = loginId.value.trim();
     const pass = password.value.trim();
 
     if (!id || !pass) {
+      errorMessage.textContent = "Please enter both fields.";
       errorMessage.style.display = "block";
       return;
     }
 
     errorMessage.style.display = "none";
+    loginBtn.disabled = true;
+    loginBtn.textContent = "Logging in…";
 
-    // Placeholder login logic — replace with your agent later
-    console.log("ID:", id);
-    console.log("Password:", pass);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loginId: id, password: pass }),
+      });
 
-    // Example redirect (change later)
-    // window.location.href = "hr.html";
+      const data = await res.json();
+
+      if (!res.ok) {
+        errorMessage.textContent = data.error || "Invalid credentials.";
+        errorMessage.style.display = "block";
+        loginBtn.disabled = false;
+        loginBtn.textContent = "Login";
+        return;
+      }
+
+      // Store the logged-in user for other screens to read
+      localStorage.setItem('currentUser', JSON.stringify(data.user));
+
+      // Redirect based on role
+      if (data.user.role === 'admin' || data.user.role === 'charge_nurse') {
+        window.location.href = '/screens/hr.html';
+      } else {
+        window.location.href = '/screens/doctor.html';
+      }
+
+    } catch (err) {
+      errorMessage.textContent = "Could not connect to the server.";
+      errorMessage.style.display = "block";
+      loginBtn.disabled = false;
+      loginBtn.textContent = "Login";
+    }
   });
 </script>
 
