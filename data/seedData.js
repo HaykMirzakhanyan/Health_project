@@ -99,31 +99,43 @@ function randomMetrics() {
 // All workload metrics are generated at runtime by randomMetrics().
 // ---------------------------------------------------------------------------
 const staffDefinitions = [
-  // --- ICU-1 ---
-  { name: 'Maria Santos',     role: 'RN',  unit: 'ICU-1',     certifications: ['ACLS', 'CCRN'] },
-  { name: 'Linda Patel',      role: 'NP',  unit: 'ICU-1',     certifications: ['ACLS', 'CCRN', 'FNP'] },
-  { name: 'Derek Nguyen',     role: 'RN',  unit: 'ICU-1',     certifications: ['ACLS', 'BLS'] },
-  { name: 'Aisha Kowalski',   role: 'CNA', unit: 'ICU-1',     certifications: ['BLS'] },
-  { name: 'Dr. Samuel Rivera',role: 'MD',  unit: 'ICU-1',     certifications: ['ACLS', 'Critical Care Board'] },
-  { name: 'Priya Mehta',      role: 'RN',  unit: 'ICU-1',     certifications: ['ACLS', 'CCRN'] },
+  // --- ICU-1 (5 doctors: 3 day + 2 night, ordered so [0-2]=day [3-4]=night) ---
+  { name: 'Linda Patel',        role: 'NP',  unit: 'ICU-1',     certifications: ['ACLS', 'CCRN', 'FNP'] },
+  { name: 'Dr. Samuel Rivera',  role: 'MD',  unit: 'ICU-1',     certifications: ['ACLS', 'Critical Care Board'] },
+  { name: 'Dr. Thomas Harlow',  role: 'MD',  unit: 'ICU-1',     certifications: ['ACLS', 'Critical Care Board'] },
+  { name: 'Dr. Emily Zhao',     role: 'MD',  unit: 'ICU-1',     certifications: ['ACLS', 'Critical Care Board'] },
+  { name: 'Dr. Marcus Flynn',   role: 'MD',  unit: 'ICU-1',     certifications: ['ACLS', 'Critical Care Board'] },
+  // ICU-1 nursing staff
+  { name: 'Maria Santos',       role: 'RN',  unit: 'ICU-1',     certifications: ['ACLS', 'CCRN'] },
+  { name: 'Derek Nguyen',       role: 'RN',  unit: 'ICU-1',     certifications: ['ACLS', 'BLS'] },
+  { name: 'Aisha Kowalski',     role: 'CNA', unit: 'ICU-1',     certifications: ['BLS'] },
+  { name: 'Priya Mehta',        role: 'RN',  unit: 'ICU-1',     certifications: ['ACLS', 'CCRN'] },
 
-  // --- ICU-2 ---
-  { name: 'James Okafor',     role: 'RN',  unit: 'ICU-2',     certifications: ['ACLS', 'CCRN'] },
-  { name: 'Fatima Al-Rashid', role: 'RN',  unit: 'ICU-2',     certifications: ['ACLS', 'BLS'] },
-  { name: 'Dr. Chen Wei',     role: 'MD',  unit: 'ICU-2',     certifications: ['ACLS', 'Critical Care Board', 'Pulmonary Fellowship'] },
-  { name: 'Rosa Martinez',    role: 'CNA', unit: 'ICU-2',     certifications: ['BLS'] },
-  { name: 'Kevin Tremblay',   role: 'RN',  unit: 'ICU-2',     certifications: ['ACLS', 'CCRN'] },
-  { name: 'Nadia Volkov',     role: 'NP',  unit: 'ICU-2',     certifications: ['ACLS', 'AGPCNP'] },
+  // --- ICU-2 (5 doctors: 3 day + 2 night, ordered so [0-2]=day [3-4]=night) ---
+  { name: 'Dr. Chen Wei',       role: 'MD',  unit: 'ICU-2',     certifications: ['ACLS', 'Critical Care Board', 'Pulmonary Fellowship'] },
+  { name: 'Nadia Volkov',       role: 'NP',  unit: 'ICU-2',     certifications: ['ACLS', 'AGPCNP'] },
+  { name: 'Dr. Priya Sharma',   role: 'MD',  unit: 'ICU-2',     certifications: ['ACLS', 'Critical Care Board'] },
+  { name: 'Dr. Michael Torres', role: 'MD',  unit: 'ICU-2',     certifications: ['ACLS', 'Critical Care Board'] },
+  { name: 'Dr. Aiko Tanaka',    role: 'MD',  unit: 'ICU-2',     certifications: ['ACLS', 'Critical Care Board', 'Pulmonary Fellowship'] },
+  // ICU-2 nursing staff
+  { name: 'James Okafor',       role: 'RN',  unit: 'ICU-2',     certifications: ['ACLS', 'CCRN'] },
+  { name: 'Fatima Al-Rashid',   role: 'RN',  unit: 'ICU-2',     certifications: ['ACLS', 'BLS'] },
+  { name: 'Rosa Martinez',      role: 'CNA', unit: 'ICU-2',     certifications: ['BLS'] },
+  { name: 'Kevin Tremblay',     role: 'RN',  unit: 'ICU-2',     certifications: ['ACLS', 'CCRN'] },
 
-  // --- MedSurg-3 ---
-  { name: 'Tamara Johnson',   role: 'RN',  unit: 'MedSurg-3', certifications: ['BLS', 'Med-Surg Cert'] },
-  { name: 'Oliver Hayes',     role: 'RN',  unit: 'MedSurg-3', certifications: ['BLS', 'ACLS'] },
-  { name: 'Dr. Anjali Singh', role: 'MD',  unit: 'MedSurg-3', certifications: ['ACLS', 'Hospitalist Board'] },
-  { name: 'Marcus Bell',      role: 'CNA', unit: 'MedSurg-3', certifications: ['BLS'] },
-  { name: 'Yuki Tanaka',      role: 'RN',  unit: 'MedSurg-3', certifications: ['BLS', 'Med-Surg Cert'] },
-  { name: 'Bethany Cross',    role: 'CNA', unit: 'MedSurg-3', certifications: ['BLS'] },
-  { name: 'Carlos Espinoza', role: 'RN',  unit: 'MedSurg-3', certifications: ['BLS', 'ACLS'] },
-  { name: 'Patricia Lee',     role: 'NP',  unit: 'MedSurg-3', certifications: ['ACLS', 'FNP', 'Med-Surg Cert'] },
+  // --- MedSurg-3 (5 doctors: 3 day + 2 night, ordered so [0-2]=day [3-4]=night) ---
+  { name: 'Dr. Anjali Singh',   role: 'MD',  unit: 'MedSurg-3', certifications: ['ACLS', 'Hospitalist Board'] },
+  { name: 'Patricia Lee',       role: 'NP',  unit: 'MedSurg-3', certifications: ['ACLS', 'FNP', 'Med-Surg Cert'] },
+  { name: 'Dr. Kevin Murphy',   role: 'MD',  unit: 'MedSurg-3', certifications: ['ACLS', 'Hospitalist Board'] },
+  { name: 'Dr. Sandra Pierce',  role: 'MD',  unit: 'MedSurg-3', certifications: ['ACLS', 'Hospitalist Board'] },
+  { name: 'Dr. Omar Hassan',    role: 'MD',  unit: 'MedSurg-3', certifications: ['ACLS', 'Hospitalist Board'] },
+  // MedSurg-3 nursing staff
+  { name: 'Tamara Johnson',     role: 'RN',  unit: 'MedSurg-3', certifications: ['BLS', 'Med-Surg Cert'] },
+  { name: 'Oliver Hayes',       role: 'RN',  unit: 'MedSurg-3', certifications: ['BLS', 'ACLS'] },
+  { name: 'Marcus Bell',        role: 'CNA', unit: 'MedSurg-3', certifications: ['BLS'] },
+  { name: 'Yuki Tanaka',        role: 'RN',  unit: 'MedSurg-3', certifications: ['BLS', 'Med-Surg Cert'] },
+  { name: 'Bethany Cross',      role: 'CNA', unit: 'MedSurg-3', certifications: ['BLS'] },
+  { name: 'Carlos Espinoza',    role: 'RN',  unit: 'MedSurg-3', certifications: ['BLS', 'ACLS'] },
 ];
 
 // ---------------------------------------------------------------------------

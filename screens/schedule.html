@@ -600,6 +600,29 @@
     cursor: pointer;
   }
 
+  .ep-role-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+
+  .ep-role-tab {
+    padding: 3px 10px;
+    font-size: 12px;
+    border: 1px solid #b5c7d8;
+    border-radius: 5px;
+    background: #f5faff;
+    color: #1f3b57;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .ep-role-tab.active {
+    background: #1f3b57;
+    color: #fff;
+    border-color: #1f3b57;
+  }
+
   .ep-staff-row {
     display: flex;
     align-items: center;
@@ -1309,6 +1332,7 @@
   let editPanelDate   = null;   // YYYY-MM-DD currently being edited
   let editEntries     = [];     // local draft copy of schedule entries
   let pendingPatients = [];     // pending patients for the edit panel
+  let editRoleFilter  = 'all';  // 'all' | 'doctors' | 'nurses'
 
   async function openEditPanel() {
     const dateStr = timelineDate.toISOString().split('T')[0];
@@ -1324,6 +1348,10 @@
     editEntries     = entriesRes.ok  ? await entriesRes.json()  : [];
     pendingPatients = patientsRes.ok ? await patientsRes.json() : [];
 
+    editRoleFilter = 'all';
+    document.querySelectorAll('.ep-role-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.role === 'all');
+    });
     renderEditStaff();
     renderEditPatients();
     document.getElementById('editPanel').classList.add('open');
@@ -1334,11 +1362,25 @@
     editPanelDate = null;
   }
 
+  function setEditRoleFilter(role) {
+    editRoleFilter = role;
+    document.querySelectorAll('.ep-role-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.role === role);
+    });
+    renderEditStaff();
+  }
+
   function renderEditStaff() {
     const list = document.getElementById('epStaffList');
-    const filtered = currentUnit === 'all'
+    let filtered = currentUnit === 'all'
       ? editEntries
       : editEntries.filter(e => e.unit === currentUnit);
+
+    if (editRoleFilter === 'doctors') {
+      filtered = filtered.filter(e => /MD|NP/i.test(e.role));
+    } else if (editRoleFilter === 'nurses') {
+      filtered = filtered.filter(e => /RN|LPN|CNA|nurse/i.test(e.role));
+    }
 
     if (!filtered.length) {
       list.innerHTML = '<p style="font-size:13px;color:#888;">No staff scheduled. Use "+ Add Staff" to add.</p>';
@@ -1622,6 +1664,11 @@
       <div class="ep-section-title">
         Staff on Shift
         <button class="ep-add-btn" onclick="openAddStaffModal()">+ Add Staff</button>
+      </div>
+      <div class="ep-role-tabs">
+        <button class="ep-role-tab active" data-role="all"     onclick="setEditRoleFilter('all')">All</button>
+        <button class="ep-role-tab"        data-role="doctors" onclick="setEditRoleFilter('doctors')">Doctors</button>
+        <button class="ep-role-tab"        data-role="nurses"  onclick="setEditRoleFilter('nurses')">Nurses</button>
       </div>
       <div id="epStaffList"></div>
     </div>
