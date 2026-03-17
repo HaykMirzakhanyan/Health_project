@@ -255,6 +255,98 @@
   .clickable-summary {
     cursor: pointer;
   }
+
+  /* APPOINTMENT CARDS IN DETAIL PANEL */
+  .appt-card {
+    background: white;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 7px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    font-size: 13px;
+  }
+
+  .appt-status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .appt-info { flex: 1; }
+  .appt-info .appt-type { font-weight: bold; font-size: 13px; }
+  .appt-info .appt-patient { color: #555; font-size: 12px; margin-top: 2px; }
+
+  .appt-time {
+    font-size: 12px;
+    color: #1f3b57;
+    font-weight: bold;
+    white-space: nowrap;
+  }
+
+  /* CONFIRMATION MODAL */
+  .confirm-modal {
+    background: #fff;
+    border-radius: 14px;
+    padding: 24px 28px;
+    min-width: 300px;
+    max-width: 400px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  }
+
+  .confirm-modal h2 {
+    margin: 0 0 10px;
+    font-size: 18px;
+    color: #1f3b57;
+  }
+
+  .confirm-modal p {
+    font-size: 14px;
+    margin: 6px 0;
+    line-height: 1.5;
+    color: #444;
+  }
+
+  .confirm-modal .swap-target {
+    background: #e9f3ff;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin: 10px 0;
+    font-size: 13px;
+  }
+
+  .confirm-modal .reject-msg {
+    background: #fde8e8;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin: 10px 0;
+    font-size: 13px;
+    color: #721c24;
+  }
+
+  .confirm-modal-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 18px;
+    justify-content: flex-end;
+  }
+
+  .confirm-modal-buttons button {
+    padding: 8px 18px;
+    border-radius: 7px;
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .btn-confirm-yes { background: #1f3b57; color: #fff; }
+  .btn-confirm-yes:hover { background: #244766; }
+  .btn-confirm-no  { background: #e2e8ee; color: #333; }
+  .btn-confirm-no:hover { background: #cdd6df; }
+  .btn-confirm-ok  { background: #1f3b57; color: #fff; margin-left: auto; }
 </style>
 </head>
 
@@ -303,6 +395,16 @@
 
 </div>
 
+<!-- CONFIRMATION MODAL -->
+<div class="modal-overlay" id="confirmOverlay">
+  <div class="confirm-modal">
+    <h2 id="confirmTitle"></h2>
+    <p id="confirmMessage"></p>
+    <div id="confirmExtra"></div>
+    <div class="confirm-modal-buttons" id="confirmButtons"></div>
+  </div>
+</div>
+
 <!-- MODAL FOR SHIFT HOURS -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal" id="shiftModal">
@@ -341,48 +443,133 @@
     return `rgb(${red}, ${green}, 0)`;
   }
 
-  /* DETAIL PANEL FOR SELECTED DOCTOR (LEFT LIST) */
+  /* CONFIRMATION MODAL */
+  const confirmOverlay = document.getElementById('confirmOverlay');
+
+  function openConfirmModal({ title, message, extra = '', buttons }) {
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMessage').textContent = message;
+    document.getElementById('confirmExtra').innerHTML = extra;
+    document.getElementById('confirmButtons').innerHTML = buttons
+      .map(b => `<button class="${b.cls}" id="cbtn-${b.id}">${b.label}</button>`)
+      .join('');
+    confirmOverlay.style.display = 'flex';
+    buttons.forEach(b => {
+      document.getElementById(`cbtn-${b.id}`).addEventListener('click', () => {
+        confirmOverlay.style.display = 'none';
+        if (b.action) b.action();
+      });
+    });
+  }
+
+  confirmOverlay.addEventListener('click', e => {
+    if (e.target === confirmOverlay) confirmOverlay.style.display = 'none';
+  });
+
+  /* FIND A SWAP CANDIDATE — same unit, not tired (<8 hrs), on shift */
+  function findSwapCandidate(name) {
+    const info = doctorInfo[name];
+    if (!info) return null;
+    const candidates = Object.entries(doctorInfo)
+      .filter(([n, d]) => n !== name && d.unit === info.unit && d.time > 0 && d.time < 8)
+      .sort((a, b) => a[1].time - b[1].time); // least hours first
+    return candidates.length ? candidates[0][0] : null;
+  }
+
+  /* STATUS COLOR FOR APPOINTMENT DOT */
+  function apptStatusColor(status) {
+    return { completed: '#27ae60', in_progress: '#2980b9', cancelled: '#e74c3c' }[status] || '#e67e22';
+  }
+
+  /* DETAIL PANEL FOR SELECTED STAFF (LEFT LIST) */
   function showDetailForDoctor(name) {
     const info = doctorInfo[name];
     if (!info) return;
 
-    const appointments = info.times.length
-      ? info.times.map(t => `<li>${t[0]} — ${t[1]} to ${t[2]}</li>`).join("")
-      : "<li>No filled appointments</li>";
+    const hasAppointments = info.appointments && info.appointments.length > 0;
 
-    const hasAppointments = info.times.length > 0;
+    const appointmentsHtml = hasAppointments
+      ? info.appointments.map(a => `
+          <div class="appt-card">
+            <span class="appt-status-dot" style="background:${apptStatusColor(a.status)};"></span>
+            <div class="appt-info">
+              <div class="appt-type">${a.type}</div>
+              <div class="appt-patient">Patient: ${a.patient}</div>
+            </div>
+            <div class="appt-time">${a.time}</div>
+          </div>`).join('')
+      : '<p style="font-size:13px;color:#888;margin:6px 0;">No appointments today.</p>';
 
     const actionButtonHtml = hasAppointments
-      ? `<button class="btn-swap-home" data-doctor="${name}">Swap and send home</button>`
-      : `<button class="btn-send-home" data-doctor="${name}">Send home</button>`;
+      ? `<button class="btn-swap-home" id="actionBtn">Swap &amp; Send Home</button>`
+      : `<button class="btn-send-home" id="actionBtn">Send Home</button>`;
 
     detailPanel.innerHTML = `
       <div class="info-box">
         <h3>Time Worked Today</h3>
-        <p class="doctor-hours" style="color:${colorHours(info.time)};">
-          ${info.time} hrs
-        </p>
-        <div class="action-buttons">
-          ${actionButtonHtml}
-        </div>
+        <p class="doctor-hours" style="color:${colorHours(info.time)};">${info.time.toFixed(1)} hrs</p>
+        <p style="font-size:13px;color:#555;margin:2px 0;">${info.specialty}</p>
+        <p style="font-size:13px;color:#555;margin:2px 0;">Shift: ${info.shiftStart} – ${info.shiftEnd}</p>
+        <div class="action-buttons">${actionButtonHtml}</div>
       </div>
-
       <div class="info-box">
         <h3>${name}'s Appointments</h3>
-        <ul>${appointments}</ul>
+        ${appointmentsHtml}
       </div>
     `;
 
-    const btn = detailPanel.querySelector('.btn-send-home, .btn-swap-home');
-    if (btn) {
-      btn.addEventListener('click', () => {
-        if (btn.classList.contains('btn-send-home')) {
-          alert(`${name} has been sent home (no appointments).`);
+    const btn = document.getElementById('actionBtn');
+    if (!btn) return;
+
+    btn.addEventListener('click', () => {
+      if (btn.classList.contains('btn-send-home')) {
+        // No appointments — just confirm send home
+        openConfirmModal({
+          title: 'Send Home',
+          message: `Are you sure you want to send ${name} home? They have no remaining appointments.`,
+          buttons: [
+            { id: 'yes', label: 'Yes, Send Home', cls: 'btn-confirm-yes', action: () => {
+              btn.textContent = '✓ Sent Home';
+              btn.disabled = true;
+              btn.style.background = '#27ae60';
+            }},
+            { id: 'no', label: 'Cancel', cls: 'btn-confirm-no' },
+          ],
+        });
+      } else {
+        // Has appointments — find a swap candidate
+        const candidate = findSwapCandidate(name);
+        if (!candidate) {
+          openConfirmModal({
+            title: 'Swap Not Possible',
+            message: `There are no available staff in ${info.unit} with fewer than 8 hours worked to take ${name}'s appointments.`,
+            extra: `<div class="reject-msg">⚠ All other staff in ${info.unit} are also over their limit or not currently on shift. Consider bringing in additional coverage.</div>`,
+            buttons: [
+              { id: 'ok', label: 'OK', cls: 'btn-confirm-ok' },
+            ],
+          });
         } else {
-          alert(`${name}'s appointments will be swapped with a non-tired doctor and they will be sent home.`);
+          const candInfo = doctorInfo[candidate];
+          openConfirmModal({
+            title: 'Swap & Send Home',
+            message: `Swap ${name}'s appointments to an available staff member and send them home?`,
+            extra: `
+              <div class="swap-target">
+                <strong>Swap to:</strong> ${candidate}<br>
+                <span style="color:#555;font-size:12px;">${candInfo.specialty} — ${candInfo.time.toFixed(1)} hrs worked today</span>
+              </div>`,
+            buttons: [
+              { id: 'yes', label: 'Confirm Swap', cls: 'btn-confirm-yes', action: () => {
+                btn.textContent = '✓ Swapped & Sent Home';
+                btn.disabled = true;
+                btn.style.background = '#27ae60';
+              }},
+              { id: 'no', label: 'Cancel', cls: 'btn-confirm-no' },
+            ],
+          });
         }
-      });
-    }
+      }
+    });
   }
 
   function hideDetailPanel() {
@@ -414,23 +601,25 @@
     const rows = [];
     Object.keys(doctorInfo).forEach(name => {
       const info = doctorInfo[name];
-      info.times.forEach(t => {
-        rows.push({
-          doctor: name,
-          patient: t[0],
-          start: t[1],
-          end: t[2]
-        });
+      (info.appointments || []).forEach(a => {
+        rows.push({ staff: name, ...a });
       });
     });
 
+    // Sort by time
+    rows.sort((a, b) => a.time.localeCompare(b.time));
+
+    const statusColor = s =>
+      ({ completed: '#27ae60', in_progress: '#2980b9', cancelled: '#e74c3c' }[s] || '#e67e22');
+
     allAppointmentsList.innerHTML = rows.length
       ? rows.map(r => `
-          <div class="summary-item">
-            <span class="label">${r.patient}</span> — ${r.start} to ${r.end} (${r.doctor})
-          </div>
-        `).join("")
-      : "<div class='summary-item'>No taken appointments</div>";
+          <div class="summary-item" style="display:flex;align-items:center;gap:7px;padding:3px 0;">
+            <span style="width:9px;height:9px;border-radius:50%;background:${statusColor(r.status)};flex-shrink:0;display:inline-block;"></span>
+            <span><span class="label">${r.patient}</span> — ${r.type}</span>
+            <span style="margin-left:auto;color:#1f3b57;font-size:12px;white-space:nowrap;">${r.time} &nbsp;·&nbsp; ${r.staff}</span>
+          </div>`).join('')
+      : "<div class='summary-item'>No appointments today.</div>";
   }
 
   /* MODAL: SHIFT HOURS */
@@ -538,13 +727,22 @@
         const shiftHours = 12; // all shifts are 12hr
 
         doctorInfo[member.name] = {
-          staffId:    member.id,
-          time:       sched.hoursWorkedToday || 0,
-          specialty:  `${member.role} — ${member.unit}`,
-          shiftStart: fmt12h(sched.shiftStart),
-          shiftEnd:   fmt12h(sched.shiftEnd),
+          staffId:     member.id,
+          unit:        member.unit,
+          time:        sched.hoursWorkedToday || 0,
+          specialty:   `${member.role} — ${member.unit}`,
+          shiftStart:  fmt12h(sched.shiftStart),
+          shiftEnd:    fmt12h(sched.shiftEnd),
           shiftHours,
           burnoutRisk: member.burnoutRisk,
+          // Rich appointment objects for the detail panel
+          appointments: memberAppts.map(a => ({
+            patient: a.patientName,
+            type:    a.type,
+            time:    fmt12h(a.time),
+            status:  a.status,
+          })),
+          // Legacy tuple format used by the all-appointments summary
           times: memberAppts.map(a => [a.patientName, fmt12h(a.time), '—']),
         };
       });
