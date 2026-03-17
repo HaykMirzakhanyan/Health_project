@@ -520,6 +520,31 @@
     align-items: center;
     gap: 10px;
     flex-shrink: 0;
+    cursor: grab;
+    user-select: none;
+  }
+  .edit-panel-header:active { cursor: grabbing; }
+  .edit-panel-header button { cursor: pointer; }
+
+  .ep-drag-grip {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    opacity: 0.55;
+    flex-shrink: 0;
+  }
+  .ep-drag-grip span {
+    display: flex;
+    gap: 3px;
+  }
+  .ep-drag-grip span::before,
+  .ep-drag-grip span::after {
+    content: '';
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #fff;
+    display: block;
   }
 
   .edit-panel-header h3 { margin: 0; font-size: 15px; }
@@ -701,6 +726,20 @@
   }
   .ep-assign-btn:disabled { background: #27ae60; cursor: default; }
 
+  .ep-resize-handle {
+    height: 6px;
+    cursor: ns-resize;
+    background: repeating-linear-gradient(
+      90deg,
+      rgba(255,255,255,0.35) 0px, rgba(255,255,255,0.35) 4px,
+      transparent 4px, transparent 8px
+    );
+    background-color: #1f3b57;
+    flex-shrink: 0;
+    transition: background-color 0.15s;
+  }
+  .ep-resize-handle:hover { background-color: #2c5282; }
+
   .ep-ai-result {
     background: #e9f3ff;
     border-left: 4px solid #f39c12;
@@ -710,6 +749,9 @@
     font-size: 12px;
     color: #333;
     line-height: 1.5;
+    max-height: 160px;
+    overflow-y: auto;
+    flex-shrink: 0;
   }
 
   .ep-add-modal {
@@ -759,7 +801,19 @@
 <body>
 
 <div class="top-bar">
-  <div class="gear">⚙</div>
+  <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;">
+    <circle cx="13" cy="13" r="5.5" fill="white"/>
+    <line x1="13" y1="1"  x2="13" y2="5.5" stroke="white" stroke-width="2" stroke-linecap="round"/>
+    <line x1="13" y1="20.5" x2="13" y2="25" stroke="white" stroke-width="2" stroke-linecap="round"/>
+    <line x1="1"  y1="13" x2="5.5" y2="13" stroke="white" stroke-width="2" stroke-linecap="round"/>
+    <line x1="20.5" y1="13" x2="25" y2="13" stroke="white" stroke-width="2" stroke-linecap="round"/>
+    <line x1="4.1"  y1="4.1"  x2="7.6" y2="7.6" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+    <line x1="18.4" y1="18.4" x2="21.9" y2="21.9" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+    <line x1="21.9" y1="4.1"  x2="18.4" y2="7.6" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+    <line x1="4.1"  y1="21.9" x2="7.6" y2="18.4" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+  </svg>
+  <span style="font-size:15px;font-weight:bold;letter-spacing:0.3px;margin-left:8px;white-space:nowrap;">SOL <span style="font-weight:400;opacity:0.85;">Innovations</span></span>
+  <div style="width:1px;height:22px;background:rgba(255,255,255,0.3);margin:0 14px;flex-shrink:0;"></div>
   <div class="title">Schedule &amp; AI Forecast</div>
   <a href="/screens/hr.html" class="nav-btn">← HR Dashboard</a>
   <span id="schedClock" style="margin-left:auto;font-family:monospace;font-size:15px;letter-spacing:1px;"></span>
@@ -1378,7 +1432,14 @@
     });
     renderEditStaff();
     renderEditPatients();
-    document.getElementById('editPanel').classList.add('open');
+    // Reset to bottom-sheet position and default size each time it opens
+    const panel = document.getElementById('editPanel');
+    panel.style.top = '';    panel.style.left   = '';
+    panel.style.width = ''; panel.style.bottom = '';
+    panel.style.right = ''; panel.style.transform = '';
+    panel.style.height = '';
+    delete panel.dataset.floating;
+    panel.classList.add('open');
   }
 
   function closeEditPanel() {
@@ -1467,7 +1528,12 @@
     if (entry) entry.status = status;
   }
 
-  function removeEntry(entryId) {
+  async function removeEntry(entryId) {
+    try {
+      await fetch(`/api/future-schedule/${entryId}`, { method: 'DELETE' });
+    } catch (err) {
+      console.error('Remove entry failed:', err);
+    }
     editEntries = editEntries.filter(e => e.id !== entryId);
     const row = document.getElementById(`eprow-${entryId}`);
     if (row) row.remove();
@@ -1533,6 +1599,10 @@
     }
   }
 
+  // Holds pending AI result until user approves or rejects
+  let _pendingAiData      = null;
+  let _pendingAiOriginals = null;
+
   async function optimizeWithAI() {
     if (!editPanelDate) return;
     const btn = document.getElementById('epOptimizeBtn');
@@ -1541,52 +1611,116 @@
 
     const resultEl = document.getElementById('epAiResult');
     resultEl.style.display = 'block';
-    resultEl.textContent = 'Running AI analysis…';
+    resultEl.innerHTML = '<em style="color:#888;">Running AI analysis…</em>';
+
+    // Snapshot current entries so we can revert if the user rejects
+    _pendingAiOriginals = editEntries.map(e => ({ id: e.id, shiftType: e.shiftType, status: e.status }));
 
     try {
       const res  = await fetch(`/api/optimize-future?date=${editPanelDate}`, { method: 'POST' });
       const data = res.ok ? await res.json() : null;
-
       if (!data) throw new Error('Empty response');
 
-      // Reload entries after AI updates
-      const entriesRes = await fetch(`/api/future-schedule?date=${editPanelDate}`);
-      editEntries = entriesRes.ok ? await entriesRes.json() : editEntries;
+      _pendingAiData = data;
 
-      // Apply patient assignments to local state
-      if (data.patientAssignments && data.patientAssignments.length) {
-        data.patientAssignments.forEach(a => {
-          const p = pendingPatients.find(x => x.id === a.patientId);
-          if (p) {
-            p.scheduled       = true;
-            p.assignedStaffId = a.staffId;
-            p.scheduledDate   = editPanelDate;
-            p.scheduledTime   = a.suggestedTime;
-          }
-        });
-      }
+      // Build a human-readable diff of proposed shift changes
+      const shiftChanges = (data.scheduleUpdates || []).map(u => {
+        const orig  = _pendingAiOriginals.find(e => e.id === u.id);
+        const entry = editEntries.find(e => e.id === u.id);
+        const name  = entry ? entry.staffName : u.id;
+        return orig && orig.shiftType !== u.shiftType
+          ? `<li>${name}: <s style="color:#999;">${orig.shiftType}</s> → <strong>${u.shiftType}</strong></li>`
+          : null;
+      }).filter(Boolean).join('');
 
-      renderEditStaff();
-      renderEditPatients();
+      const assignments = (data.patientAssignments || []).map(a =>
+        `<li>${a.patientName} → ${a.staffName} @ ${a.suggestedTime}${a.reason ? ` <span style="color:#888;font-size:11px;">(${a.reason})</span>` : ''}</li>`
+      ).join('');
 
-      let resultHtml = '';
-      if (data.summary) resultHtml += `<strong>Summary:</strong> ${data.summary}<br>`;
-      if (data.suggestions && data.suggestions.length) {
-        resultHtml += `<strong>Tips:</strong> ${data.suggestions.map(s => `• ${s}`).join('<br>')}`;
-      }
-      if (data.patientAssignments && data.patientAssignments.length) {
-        resultHtml += `<br><strong>Patient assignments (${data.patientAssignments.length}):</strong> ` +
-          data.patientAssignments.map(a => `${a.patientName} → ${a.staffName} at ${a.suggestedTime}`).join(', ');
-      }
-      resultEl.innerHTML = resultHtml || 'Optimization complete — no changes suggested.';
+      const tips = (data.suggestions || []).map(s => `<li>${s}</li>`).join('');
+
+      const hasChanges = shiftChanges || assignments;
+
+      resultEl.innerHTML = `
+        <div style="margin-bottom:10px;">
+          ${data.summary ? `<p style="margin:0 0 8px;"><strong>AI Summary:</strong> ${data.summary}</p>` : ''}
+          ${shiftChanges ? `<p style="margin:0 0 4px;font-weight:bold;">Proposed shift changes:</p><ul style="margin:0 0 8px;padding-left:18px;font-size:13px;">${shiftChanges}</ul>` : ''}
+          ${assignments  ? `<p style="margin:0 0 4px;font-weight:bold;">Patient assignments:</p><ul style="margin:0 0 8px;padding-left:18px;font-size:13px;">${assignments}</ul>` : ''}
+          ${tips         ? `<p style="margin:0 0 4px;font-weight:bold;">Tips:</p><ul style="margin:0 0 8px;padding-left:18px;font-size:13px;">${tips}</ul>` : ''}
+          ${!hasChanges  ? '<em style="color:#888;">No schedule changes suggested.</em>' : ''}
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button onclick="approveAiChanges()"
+            style="padding:6px 16px;background:#27ae60;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:bold;">
+            ✓ Approve &amp; Apply
+          </button>
+          <button onclick="rejectAiChanges()"
+            style="padding:6px 16px;background:#e74c3c;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:bold;">
+            ✗ Reject Changes
+          </button>
+        </div>`;
 
     } catch (err) {
       resultEl.textContent = `AI optimization failed: ${err.message}`;
+      _pendingAiData = null;
+      _pendingAiOriginals = null;
       console.error(err);
     }
 
     btn.disabled = false;
     btn.textContent = 'Optimize with AI';
+  }
+
+  async function approveAiChanges() {
+    const data = _pendingAiData;
+    if (!data) return;
+
+    // Server already applied schedule updates — reload to reflect them
+    const entriesRes = await fetch(`/api/future-schedule?date=${editPanelDate}`);
+    editEntries = entriesRes.ok ? await entriesRes.json() : editEntries;
+
+    // Apply patient assignments to local pending-patient state
+    (data.patientAssignments || []).forEach(a => {
+      const p = pendingPatients.find(x => x.id === a.patientId);
+      if (p) {
+        p.scheduled       = true;
+        p.assignedStaffId = a.staffId;
+        p.scheduledDate   = editPanelDate;
+        p.scheduledTime   = a.suggestedTime;
+      }
+    });
+
+    renderEditStaff();
+    renderEditPatients();
+
+    const resultEl = document.getElementById('epAiResult');
+    resultEl.innerHTML = '<span style="color:#27ae60;font-weight:bold;">✓ AI changes approved and applied.</span>';
+
+    _pendingAiData = null;
+    _pendingAiOriginals = null;
+  }
+
+  async function rejectAiChanges() {
+    const originals = _pendingAiOriginals;
+    if (originals && originals.length) {
+      // Revert the server-side changes by PATCHing every entry back to its original state
+      await Promise.all(originals.map(orig =>
+        fetch(`/api/future-schedule/${orig.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ shiftType: orig.shiftType, status: orig.status }),
+        })
+      ));
+      const entriesRes = await fetch(`/api/future-schedule?date=${editPanelDate}`);
+      editEntries = entriesRes.ok ? await entriesRes.json() : editEntries;
+      renderEditStaff();
+    }
+
+    const resultEl = document.getElementById('epAiResult');
+    resultEl.innerHTML = '<span style="color:#e74c3c;font-weight:bold;">✗ AI changes rejected — schedule unchanged.</span>';
+
+    _pendingAiData = null;
+    _pendingAiOriginals = null;
   }
 
   // Add Staff Modal
@@ -1671,11 +1805,96 @@
   }
 
   init();
+
+  // ── EDIT PANEL RESIZE ───────────────────────────────────────────────────
+  (function () {
+    const panel  = document.getElementById('editPanel');
+    const handle = document.getElementById('epResizeHandle');
+    let resizing = false, startY = 0, startH = 0, startTop = 0;
+
+    handle.addEventListener('mousedown', (e) => {
+      resizing  = true;
+      startY    = e.clientY;
+      startH    = panel.offsetHeight;
+      startTop  = panel.getBoundingClientRect().top;
+      panel.style.transition = 'none';
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!resizing) return;
+      const dy = e.clientY - startY;
+      if (panel.dataset.floating) {
+        // Floating window: drag top edge upward to grow, downward to shrink
+        const newH   = Math.max(150, startH - dy);
+        const newTop = Math.max(0, startTop + dy);
+        panel.style.height = newH   + 'px';
+        panel.style.top    = newTop + 'px';
+      } else {
+        // Bottom sheet: drag upward to grow
+        const newH = Math.max(150, Math.min(startH - dy, window.innerHeight - 54));
+        panel.style.height = newH + 'px';
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (resizing) {
+        resizing = false;
+        panel.style.transition = '';
+      }
+    });
+  })();
+
+  // ── EDIT PANEL DRAG ─────────────────────────────────────────────────────
+  (function () {
+    const panel  = document.getElementById('editPanel');
+    const header = document.getElementById('editPanelHeader');
+    let dragging = false, ox = 0, oy = 0;
+
+    header.addEventListener('mousedown', (e) => {
+      if (e.target.closest('button')) return;   // don't drag when clicking buttons
+
+      // On first drag: convert from full-width bottom sheet to floating window
+      if (!panel.dataset.floating) {
+        const rect = panel.getBoundingClientRect();
+        panel.style.transition = 'none';
+        panel.style.bottom    = 'auto';
+        panel.style.right     = 'auto';
+        panel.style.top       = rect.top  + 'px';
+        panel.style.left      = rect.left + 'px';
+        panel.style.width     = rect.width + 'px';
+        panel.style.transform = 'none';
+        panel.dataset.floating = '1';
+        requestAnimationFrame(() => { panel.style.transition = ''; });
+      }
+
+      dragging = true;
+      const rect = panel.getBoundingClientRect();
+      ox = e.clientX - rect.left;
+      oy = e.clientY - rect.top;
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      let newLeft = e.clientX - ox;
+      let newTop  = e.clientY - oy;
+      // Keep panel within viewport
+      newLeft = Math.max(0, Math.min(window.innerWidth  - panel.offsetWidth,  newLeft));
+      newTop  = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, newTop));
+      panel.style.left = newLeft + 'px';
+      panel.style.top  = newTop  + 'px';
+    });
+
+    document.addEventListener('mouseup', () => { dragging = false; });
+  })();
 </script>
 
 <!-- EDIT PANEL -->
 <div class="edit-panel" id="editPanel">
-  <div class="edit-panel-header">
+  <div class="ep-resize-handle" id="epResizeHandle"></div>
+  <div class="edit-panel-header" id="editPanelHeader">
+    <div class="ep-drag-grip"><span></span><span></span><span></span></div>
     <h3>Edit Schedule</h3>
     <span class="ep-date" id="epDateLabel"></span>
     <button class="ep-optimize-btn" id="epOptimizeBtn" onclick="optimizeWithAI()">Optimize with AI</button>
