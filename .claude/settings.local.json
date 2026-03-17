@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:ibm-client-engineering.github.io)"
+      "WebFetch(domain:ibm-client-engineering.github.io)",
+      "Bash(xargs ls:*)"
     ]
   }
 }

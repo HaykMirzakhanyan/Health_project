@@ -356,7 +356,8 @@
   <div class="gear">⚙</div>
   <div class="title">HR Dashboard</div>
   <a href="/screens/schedule.html" style="margin-left:16px;padding:5px 12px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.35);color:#fff;border-radius:6px;font-size:13px;cursor:pointer;text-decoration:none;">📅 Schedule & Forecast</a>
-  <button class="logout-btn" onclick="logout()">Logout</button>
+  <span id="hrClock" style="margin-left:auto;font-family:monospace;font-size:15px;letter-spacing:1px;"></span>
+  <button class="logout-btn" style="margin-left:16px;" onclick="logout()">Logout</button>
 </div>
 
 <div class="layout">
@@ -384,6 +385,14 @@
       <div class="info-box" style="font-size: 36px; padding: 40px;">
         <h3 style="font-size: 28px;">All Taken Appointments</h3>
         <div class="summary-list" id="allAppointmentsList" style="font-size: 36px;"></div>
+      </div>
+    </div>
+
+    <!-- OFF SHIFT SECTION -->
+    <div id="offShiftPanel" style="display:none;">
+      <div class="info-box-small">
+        <h3>Off Shift</h3>
+        <div id="offShiftList"></div>
       </div>
     </div>
 
@@ -419,12 +428,49 @@
 </div>
 
 <script>
+  /* LIVE CLOCK */
+  function startClock() {
+    function tick() {
+      const now = new Date();
+      document.getElementById('hrClock').textContent =
+        now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+    tick();
+    setInterval(tick, 1000);
+  }
+
+  /* LIVE HOURS CALCULATION */
+  function calcLiveHours(start24, end24) {
+    if (!start24 || !end24) return 0;
+    const toMins = t => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0); };
+    const now = new Date();
+    const nowMins   = now.getHours() * 60 + now.getMinutes();
+    const startMins = toMins(start24);
+    const endMins   = toMins(end24);
+    let shiftLen = endMins - startMins;
+    if (shiftLen <= 0) shiftLen += 1440;
+    let worked;
+    if (endMins > startMins) {
+      if (nowMins < startMins)     worked = 0;
+      else if (nowMins >= endMins) worked = shiftLen;
+      else                         worked = nowMins - startMins;
+    } else {
+      if (nowMins >= startMins)    worked = nowMins - startMins;
+      else if (nowMins < endMins)  worked = (1440 - startMins) + nowMins;
+      else                         worked = shiftLen;
+    }
+    return Math.min(worked / 60, shiftLen / 60);
+  }
+
   const wheel = document.querySelector('.wheel-container');
   let items = [];
   const leftPanel = document.getElementById('leftPanel');
   const detailPanel = document.getElementById('detailPanel');
   const allDoctorsList = document.getElementById('allDoctorsList');
   const allAppointmentsList = document.getElementById('allAppointmentsList');
+  const offShiftPanel = document.getElementById('offShiftPanel');
+  const offShiftList = document.getElementById('offShiftList');
+  let sentHomeStaff = [];
 
   const modalOverlay = document.getElementById('modalOverlay');
   const modalDoctorName = document.getElementById('modalDoctorName');
@@ -481,6 +527,52 @@
     return { completed: '#27ae60', in_progress: '#2980b9', cancelled: '#e74c3c' }[status] || '#e67e22';
   }
 
+  /* REMOVE FROM TIRED LIST AND ADD TO OFF SHIFT */
+  function sendHome(name, replacedBy) {
+    sentHomeStaff.push({ name, replacedBy: replacedBy || null, info: doctorInfo[name] });
+
+    // Persist to localStorage so schedule.html can read it
+    const toSave = sentHomeStaff.map(s => ({
+      staffId:    s.info.staffId,
+      name:       s.name,
+      replacedBy: s.replacedBy,
+    }));
+    localStorage.setItem('healthSentHome', JSON.stringify(toSave));
+
+    // Remove from tired wheel
+    const item = [...document.querySelectorAll('.wheel-item')].find(i => i.textContent.trim() === name);
+    if (item) item.remove();
+    items = document.querySelectorAll('.wheel-item');
+
+    // If no tired staff remain, show placeholder
+    const doctorListEl = document.getElementById('doctorList');
+    if (doctorListEl && doctorListEl.children.length === 0) {
+      doctorListEl.innerHTML = '<li class="wheel-item" style="opacity:0.5;cursor:default;">No staff over 8 hrs</li>';
+      items = document.querySelectorAll('.wheel-item');
+    }
+
+    updateWheel();
+    hideDetailPanel();
+    buildOffShiftSection();
+  }
+
+  function buildOffShiftSection() {
+    if (!sentHomeStaff.length) {
+      offShiftPanel.style.display = 'none';
+      return;
+    }
+    offShiftPanel.style.display = 'block';
+    offShiftList.innerHTML = sentHomeStaff.map(s => `
+      <div class="summary-item" style="padding:5px 0;border-bottom:1px solid #d0e4f7;">
+        <span class="label">${s.name}</span>
+        <span style="color:#555;font-size:12px;"> — ${s.info.specialty}</span>
+        ${s.replacedBy
+          ? `<div style="font-size:12px;color:#27ae60;margin-top:2px;">Appointments reassigned to <strong>${s.replacedBy}</strong></div>`
+          : `<div style="font-size:12px;color:#888;margin-top:2px;">No appointments — sent home</div>`
+        }
+      </div>`).join('');
+  }
+
   /* DETAIL PANEL FOR SELECTED STAFF (LEFT LIST) */
   function showDetailForDoctor(name) {
     const info = doctorInfo[name];
@@ -507,7 +599,7 @@
     detailPanel.innerHTML = `
       <div class="info-box">
         <h3>Time Worked Today</h3>
-        <p class="doctor-hours" style="color:${colorHours(info.time)};">${info.time.toFixed(1)} hrs</p>
+        <p class="doctor-hours" style="color:${colorHours(info.time)};">${info.time.toFixed(2)} hrs</p>
         <p style="font-size:13px;color:#555;margin:2px 0;">${info.specialty}</p>
         <p style="font-size:13px;color:#555;margin:2px 0;">Shift: ${info.shiftStart} – ${info.shiftEnd}</p>
         <div class="action-buttons">${actionButtonHtml}</div>
@@ -529,9 +621,7 @@
           message: `Are you sure you want to send ${name} home? They have no remaining appointments.`,
           buttons: [
             { id: 'yes', label: 'Yes, Send Home', cls: 'btn-confirm-yes', action: () => {
-              btn.textContent = '✓ Sent Home';
-              btn.disabled = true;
-              btn.style.background = '#27ae60';
+              sendHome(name, null);
             }},
             { id: 'no', label: 'Cancel', cls: 'btn-confirm-no' },
           ],
@@ -556,13 +646,25 @@
             extra: `
               <div class="swap-target">
                 <strong>Swap to:</strong> ${candidate}<br>
-                <span style="color:#555;font-size:12px;">${candInfo.specialty} — ${candInfo.time.toFixed(1)} hrs worked today</span>
+                <span style="color:#555;font-size:12px;">${candInfo.specialty} — ${candInfo.time.toFixed(2)} hrs worked today</span>
               </div>`,
             buttons: [
               { id: 'yes', label: 'Confirm Swap', cls: 'btn-confirm-yes', action: () => {
-                btn.textContent = '✓ Swapped & Sent Home';
-                btn.disabled = true;
-                btn.style.background = '#27ae60';
+                // Reassign appointments to candidate
+                const appts = doctorInfo[name].appointments || [];
+                doctorInfo[candidate].appointments = [
+                  ...(doctorInfo[candidate].appointments || []),
+                  ...appts,
+                ];
+                doctorInfo[candidate].times = [
+                  ...(doctorInfo[candidate].times || []),
+                  ...(doctorInfo[name].times || []),
+                ];
+                doctorInfo[name].appointments = [];
+                doctorInfo[name].times = [];
+
+                sendHome(name, candidate);
+                buildAllAppointmentsSummary();
               }},
               { id: 'no', label: 'Cancel', cls: 'btn-confirm-no' },
             ],
@@ -583,7 +685,7 @@
       const info = doctorInfo[name];
       return `
         <div class="summary-item clickable-summary" data-doctor="${name}" style="color:${colorHours(info.time)};">
-          <span class="label">${name}</span> — ${info.time} hrs
+          <span class="label">${name}</span> — ${info.time.toFixed(2)} hrs
         </div>
       `;
     }).join("");
@@ -630,7 +732,7 @@
     modalDoctorName.textContent = name + " — Shift Details";
     modalShiftRange.textContent = `Shift: ${info.shiftStart} to ${info.shiftEnd}`;
     modalShiftHours.textContent = `Scheduled shift length: ${info.shiftHours} hours`;
-    modalWorkedHours.textContent = `Hours worked today: ${info.time} hours`;
+    modalWorkedHours.textContent = `Hours worked today: ${info.time.toFixed(2)} hours`;
     modalOverlay.style.display = "flex";
   }
 
@@ -727,7 +829,7 @@
         const shiftHours = 12; // all shifts are 12hr
 
         // Live burnout estimate based on hours + chronic factors (mirrors schedule.html logic)
-        const hoursToday = sched.hoursWorkedToday || 0;
+        const hoursToday = calcLiveHours(sched.shiftStart, sched.shiftEnd);
         const liveRisk = (() => {
           let score = 0;
           if (hoursToday >= 10) score += 3;
@@ -745,12 +847,14 @@
         })();
 
         doctorInfo[member.name] = {
-          staffId:     member.id,
-          unit:        member.unit,
-          time:        hoursToday,
-          specialty:   `${member.role} — ${member.unit}`,
-          shiftStart:  fmt12h(sched.shiftStart),
-          shiftEnd:    fmt12h(sched.shiftEnd),
+          staffId:      member.id,
+          unit:         member.unit,
+          time:         hoursToday,
+          specialty:    `${member.role} — ${member.unit}`,
+          shiftStart:   fmt12h(sched.shiftStart),
+          shiftEnd:     fmt12h(sched.shiftEnd),
+          shiftStart24: sched.shiftStart || '',
+          shiftEnd24:   sched.shiftEnd   || '',
           shiftHours,
           burnoutRisk: member.burnoutRisk || liveRisk,
           // Rich appointment objects for the detail panel
@@ -793,6 +897,34 @@
       updateWheel();
       buildAllDoctorsSummary();
       buildAllAppointmentsSummary();
+
+      // Restore sent-home staff from a previous session / navigation
+      const saved = JSON.parse(localStorage.getItem('healthSentHome') || '[]');
+      saved.forEach(s => {
+        if (!doctorInfo[s.name]) return;
+        if (sentHomeStaff.find(x => x.name === s.name)) return; // already added
+        sentHomeStaff.push({ name: s.name, replacedBy: s.replacedBy, info: doctorInfo[s.name] });
+        const item = [...document.querySelectorAll('.wheel-item')].find(i => i.textContent.trim() === s.name);
+        if (item) item.remove();
+      });
+      items = document.querySelectorAll('.wheel-item');
+      if (!document.querySelector('.wheel-item')) {
+        document.getElementById('doctorList').innerHTML =
+          '<li class="wheel-item" style="opacity:0.5;cursor:default;">No staff over 8 hrs</li>';
+        items = document.querySelectorAll('.wheel-item');
+      }
+      updateWheel();
+      buildOffShiftSection();
+
+      // Refresh hours every 60s
+      setInterval(() => {
+        Object.values(doctorInfo).forEach(info => {
+          info.time = calcLiveHours(info.shiftStart24, info.shiftEnd24);
+        });
+        buildAllDoctorsSummary();
+      }, 60000);
+
+      startClock();
 
     } catch (err) {
       console.error('Failed to load HR dashboard:', err);

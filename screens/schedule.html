@@ -326,7 +326,8 @@
   <div class="gear">⚙</div>
   <div class="title">Schedule &amp; AI Forecast</div>
   <a href="/screens/hr.html" class="nav-btn">← HR Dashboard</a>
-  <button class="logout-btn" onclick="logout()">Logout</button>
+  <span id="schedClock" style="margin-left:auto;font-family:monospace;font-size:15px;letter-spacing:1px;"></span>
+  <button class="logout-btn" style="margin-left:16px;" onclick="logout()">Logout</button>
 </div>
 
 <div class="layout">
@@ -404,6 +405,46 @@
   let allStaff    = [];
   let currentUnit = 'all';
 
+  /* LIVE CLOCK */
+  function startClock() {
+    function tick() {
+      const now = new Date();
+      document.getElementById('schedClock').textContent =
+        now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+    tick();
+    setInterval(tick, 1000);
+  }
+
+  /* LIVE HOURS CALCULATION */
+  function calcLiveHours(start24, end24) {
+    if (!start24 || !end24) return 0;
+    const toMins = t => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0); };
+    const now = new Date();
+    const nowMins   = now.getHours() * 60 + now.getMinutes();
+    const startMins = toMins(start24);
+    const endMins   = toMins(end24);
+    let shiftLen = endMins - startMins;
+    if (shiftLen <= 0) shiftLen += 1440;
+    let worked;
+    if (endMins > startMins) {
+      if (nowMins < startMins)     worked = 0;
+      else if (nowMins >= endMins) worked = shiftLen;
+      else                         worked = nowMins - startMins;
+    } else {
+      if (nowMins >= startMins)    worked = nowMins - startMins;
+      else if (nowMins < endMins)  worked = (1440 - startMins) + nowMins;
+      else                         worked = shiftLen;
+    }
+    return Math.min(worked / 60, shiftLen / 60);
+  }
+
+  /* SENT-HOME STATE from HR dashboard */
+  function getSentHomeIds() {
+    const saved = JSON.parse(localStorage.getItem('healthSentHome') || '[]');
+    return new Set(saved.map(s => s.staffId));
+  }
+
   // ── AUTH ─────────────────────────────────────────────────
   function logout() {
     localStorage.removeItem('currentUser');
@@ -432,7 +473,7 @@
   function hoursBar(hours) {
     const pct = (hours / 12) * 100;
     const color = pct < 25 ? '#27ae60' : pct <= 75 ? '#d4a017' : '#e74c3c';
-    return `<strong style="color:${color};">${hours.toFixed(1)} hrs</strong>`;
+    return `<strong style="color:${color};">${hours.toFixed(2)} hrs</strong>`;
   }
 
   /**
@@ -446,10 +487,10 @@
     // ── Today's hours (most immediate signal) ──
     if (hoursToday >= 10) {
       score += 3;
-      factors.push(`${hoursToday.toFixed(1)} hrs worked today`);
+      factors.push(`${hoursToday.toFixed(2)} hrs worked today`);
     } else if (hoursToday >= 8) {
       score += 2;
-      factors.push(`${hoursToday.toFixed(1)} hrs worked today`);
+      factors.push(`${hoursToday.toFixed(2)} hrs worked today`);
     } else if (hoursToday >= 6) {
       score += 1;
     }
@@ -509,17 +550,24 @@
       return;
     }
 
+    const sentHomeIds = getSentHomeIds();
+
     tbody.innerHTML = filtered.map(entry => {
-      const member = staffMap[entry.staffId] || {};
-      const hours  = entry.hoursWorkedToday || 0;
+      const member    = staffMap[entry.staffId] || {};
+      const hours     = calcLiveHours(entry.shiftStart, entry.shiftEnd);
+      const isOffShift = sentHomeIds.has(entry.staffId);
+      const rowStyle  = isOffShift ? 'opacity:0.5;' : '';
+      const shiftCell = isOffShift
+        ? '<span class="shift-badge shift-absent">Off Shift</span>'
+        : `${shiftBadge(entry.shiftType, entry.status)} <span style="font-size:11px;color:#888;">${entry.shiftStart || ''}–${entry.shiftEnd || ''}</span>`;
       return `
-        <tr>
+        <tr style="${rowStyle}">
           <td>${entry.staffName || member.name || '—'}</td>
           <td>${entry.role || member.role || '—'}</td>
           <td>${entry.unit}</td>
-          <td>${shiftBadge(entry.shiftType, entry.status)} <span style="font-size:11px;color:#888;">${entry.shiftStart || ''}–${entry.shiftEnd || ''}</span></td>
-          <td>${hoursBar(hours)}</td>
-          <td style="line-height:1.6;">${riskCell(hours, member)}</td>
+          <td>${shiftCell}</td>
+          <td>${isOffShift ? '<span style="color:#999;">—</span>' : hoursBar(hours)}</td>
+          <td style="line-height:1.6;">${isOffShift ? '<span style="color:#999;font-size:12px;">Sent home</span>' : riskCell(hours, member)}</td>
         </tr>`;
     }).join('');
   }
@@ -684,6 +732,11 @@
           document.getElementById('lastRunText').textContent = `Last run: ${t}`;
         }
       }
+
+      // Refresh schedule table every 60s (live hours + off-shift state)
+      setInterval(renderSchedule, 60000);
+      startClock();
+
     } catch (err) {
       console.error('Init failed:', err);
     }

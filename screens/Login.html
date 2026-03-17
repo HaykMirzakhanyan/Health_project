@@ -137,7 +137,7 @@
       localStorage.setItem('currentUser', JSON.stringify(data.user));
 
       // Redirect based on role
-      if (data.user.role === 'admin' || data.user.role === 'charge_nurse') {
+      if (data.user.role === 'admin') {
         window.location.href = '/screens/hr.html';
       } else {
         window.location.href = '/screens/doctor.html';

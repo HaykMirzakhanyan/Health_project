@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Doctor Dashboard</title>
+<title id="pageTitle">Dashboard</title>
 
 <style>
   body {
@@ -98,9 +98,11 @@
     width: 100%;
     height: 100%;
     overflow-y: scroll;
+    overflow-x: hidden;
     scroll-snap-type: y mandatory;
     perspective: 1200px;
     padding-right: 10px;
+    box-sizing: border-box;
   }
 
   .appointment-list {
@@ -116,7 +118,8 @@
     border-radius: 10px;
     padding: 10px 14px;
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+    justify-content: center;
     align-items: center;
     scroll-snap-align: center;
     cursor: pointer;
@@ -132,11 +135,26 @@
     font-weight: bold;
   }
 
+  .appointment-item span:first-child {
+    display: flex;
+    align-items: center;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .appointment-item span:last-child {
+    font-size: 13px;
+    color: #555;
+  }
+
   .status-dot {
     width: 10px;
     height: 10px;
     border-radius: 50%;
     margin-right: 8px;
+    flex-shrink: 0;
   }
 
   /* RIGHT COLUMN */
@@ -161,6 +179,8 @@
   .detail-box h3 {
     margin-top: 0;
     font-size: 20px;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
 
   .detail-box p {
@@ -192,7 +212,7 @@
 
 <div class="top-bar">
   <div class="gear">⚙</div>
-  <div class="title">Doctor Dashboard</div>
+  <div class="title" id="dashboardTitle">Dashboard</div>
   <button class="logout-btn" onclick="logout()">Logout</button>
 </div>
 
@@ -232,6 +252,7 @@
   const appointmentContainer = document.querySelector('.appointment-container');
   const appointmentList = document.getElementById('appointmentList');
   const detailPanel = document.getElementById('detailPanel');
+  const completedIds = new Set();
 
   /* MEDIUM TILT SCROLL EFFECT */
   function updateTilt() {
@@ -345,7 +366,15 @@
       return;
     }
 
-    document.querySelector('.greeting').textContent = `Hello, ${currentUser.name.replace(/^Dr\.\s*/i, 'Dr. ')}`;
+    const isNurse = currentUser.role === 'charge_nurse' || (currentUser.title || '').match(/RN|NP|nurse/i);
+    const dashLabel = isNurse ? 'Nurse Dashboard' : 'Doctor Dashboard';
+    document.getElementById('pageTitle').textContent = dashLabel;
+    document.getElementById('dashboardTitle').textContent = dashLabel;
+
+    const greeting = isNurse
+      ? `Hello, ${currentUser.name}`
+      : `Hello, ${currentUser.name.replace(/^Dr\.\s*/i, 'Dr. ')}`;
+    document.querySelector('.greeting').textContent = greeting;
 
     try {
       // Fetch schedule entry, appointments, and patients in parallel
@@ -432,6 +461,7 @@
         const notes   = item.dataset.notes;
         const time    = item.dataset.time;
 
+        const alreadyDone = completedIds.has(apptId);
         detailPanel.innerHTML = `
           <div class="detail-box">
             <h3>${patient}</h3>
@@ -439,29 +469,34 @@
             <p><strong>Time:</strong> ${time}</p>
             <p><strong>Reason:</strong> ${reason}</p>
             <p><strong>Notes:</strong> ${notes}</p>
-            <button class="complete-btn" data-id="${apptId}">Mark Complete</button>
+            <button class="complete-btn" data-id="${apptId}"
+              ${alreadyDone ? 'disabled style="background:#27ae60"' : ''}>
+              ${alreadyDone ? 'Completed ✓' : 'Mark Complete'}
+            </button>
           </div>
         `;
 
         const btn = detailPanel.querySelector('.complete-btn');
-        btn.addEventListener('click', async () => {
-          const id = btn.dataset.id;
-          if (!id) return;
-          try {
-            await fetch(`/api/appointments/${id}/status`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ status: 'completed' }),
-            });
-            btn.textContent = 'Completed ✓';
-            btn.disabled = true;
-            btn.style.background = '#27ae60';
-            // Update the dot color in the list
-            item.querySelector('.status-dot').style.background = '#27ae60';
-          } catch (err) {
-            console.error('Failed to mark complete:', err);
-          }
-        });
+        if (!alreadyDone) {
+          btn.addEventListener('click', async () => {
+            const id = btn.dataset.id;
+            if (!id) return;
+            try {
+              await fetch(`/api/appointments/${id}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'completed' }),
+              });
+              completedIds.add(id);
+              btn.textContent = 'Completed ✓';
+              btn.disabled = true;
+              btn.style.background = '#27ae60';
+              item.querySelector('.status-dot').style.background = '#27ae60';
+            } catch (err) {
+              console.error('Failed to mark complete:', err);
+            }
+          });
+        }
       });
     });
   }
