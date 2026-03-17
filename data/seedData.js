@@ -157,6 +157,58 @@ function pickShiftType(nightRatio) {
   return 'day';
 }
 
+/**
+ * Returns a realistic per-staff patient load for a given unit and date.
+ *
+ * Models three layers of variation:
+ *   1. Day-of-week  — weekdays busier than weekends (Mon/Tue/Wed peak)
+ *   2. Week-of-month — week 2–3 simulate a mid-month surge (post-weekend
+ *      admissions, elective procedure backlog)
+ *   3. Unit-specific spikes — ICU-1 has a Monday cardiac cath spike;
+ *      ICU-2 has a Wednesday thoracic surgery influx;
+ *      MedSurg-3 spikes Friday as elective step-downs arrive
+ *
+ * ICU staff ratios are 1:2, so an ICU nurse carries 2–4 patients.
+ * MedSurg ratios are 1:5, so a MedSurg nurse carries 4–8 patients.
+ */
+function realisticPatientLoad(unit, dateIso) {
+  const date    = new Date(dateIso);
+  const dow     = date.getDay();          // 0 = Sunday … 6 = Saturday
+  const dayOfMonth = date.getDate();
+  const weekOfMonth = Math.min(Math.floor((dayOfMonth - 1) / 7), 3); // 0–3
+
+  // Day-of-week multipliers — Mon(1)/Tue(2)/Wed(3) are busiest
+  const DOW_FACTOR = [0.70, 1.12, 1.18, 1.16, 1.08, 0.90, 0.65];
+
+  // Week-of-month multipliers — weeks 1 & 2 tend to be busier
+  const WEEK_FACTOR = [0.90, 1.18, 1.22, 0.95];
+
+  const dowF  = DOW_FACTOR[dow];
+  const weekF = WEEK_FACTOR[weekOfMonth];
+
+  if (unit === 'ICU-1') {
+    // Monday cardiac-cath spike (+0.5 extra patients on average)
+    const spike  = dow === 1 ? 0.6 : 0;
+    const base   = (2.3 * dowF * weekF) + spike;
+    const jitter = (Math.random() - 0.5) * 0.8;
+    return Math.max(1, Math.min(4, Math.round(base + jitter)));
+  }
+
+  if (unit === 'ICU-2') {
+    // Wednesday thoracic-surgery influx
+    const spike  = dow === 3 ? 0.7 : 0;
+    const base   = (2.1 * dowF * weekF) + spike;
+    const jitter = (Math.random() - 0.5) * 0.8;
+    return Math.max(1, Math.min(4, Math.round(base + jitter)));
+  }
+
+  // MedSurg-3 — Friday elective step-downs, lower Sunday/Monday
+  const spike  = dow === 5 ? 1.2 : 0;
+  const base   = (5.2 * dowF * weekF) + spike;
+  const jitter = (Math.random() - 0.5) * 2.0;
+  return Math.max(2, Math.min(9, Math.round(base + jitter)));
+}
+
 const seedShifts = [];
 
 seedStaff.forEach((member) => {
@@ -165,20 +217,17 @@ seedStaff.forEach((member) => {
     // Skip some days to simulate days off (~35% chance of day off)
     if (Math.random() < 0.35) continue;
 
+    const dateIso   = relativeDate(dayOffset);
     const shiftType = pickShiftType(member.nightShiftRatio);
-    const patientLoad =
-      member.unit === 'MedSurg-3'
-        ? Math.floor(Math.random() * 4) + 4   // 4–7 patients
-        : Math.floor(Math.random() * 2) + 2;  // 2–3 patients (ICU)
 
     seedShifts.push(
       createShift({
-        staffId: member.id,
-        unit: member.unit,
-        date: relativeDate(dayOffset),
-        type: shiftType,
-        hoursWorked: shiftType === 'day' ? 12 : 12,
-        patientLoad,
+        staffId:     member.id,
+        unit:        member.unit,
+        date:        dateIso,
+        type:        shiftType,
+        hoursWorked: 12,
+        patientLoad: realisticPatientLoad(member.unit, dateIso),
       })
     );
   }
@@ -189,45 +238,65 @@ seedStaff.forEach((member) => {
 // These feed Agent 1 (Demand Forecasting) as known demand spikes.
 // ---------------------------------------------------------------------------
 const seedProcedures = [
+  // ── Today ──────────────────────────────────────────────────────────────
   {
-    id: uuidv4(),
-    unit: 'ICU-1',
-    date: relativeDate(0),
-    type: 'Cardiac Cath x2',
-    estimatedAdditionalCensus: 2,
-    notes: 'Back-to-back cath lab cases, expect 2 ICU admissions post-procedure',
+    id: uuidv4(), unit: 'ICU-1', date: relativeDate(0),
+    type: 'Cardiac Cath x2', estimatedAdditionalCensus: 2,
+    notes: 'Back-to-back cath lab cases, expect 2 ICU-1 admissions post-procedure',
   },
   {
-    id: uuidv4(),
-    unit: 'ICU-2',
-    date: relativeDate(1),
-    type: 'Major Thoracic Surgery x1',
-    estimatedAdditionalCensus: 1,
+    id: uuidv4(), unit: 'ICU-2', date: relativeDate(0),
+    type: 'Emergent Intubation x1', estimatedAdditionalCensus: 1,
+    notes: 'Respiratory failure transfer from ED, immediate ICU-2 bed needed',
+  },
+  {
+    id: uuidv4(), unit: 'MedSurg-3', date: relativeDate(0),
+    type: 'Elective Cholecystectomy x2', estimatedAdditionalCensus: 2,
+    notes: 'Two lap chole cases; overnight MedSurg-3 obs expected',
+  },
+
+  // ── Day +1 ─────────────────────────────────────────────────────────────
+  {
+    id: uuidv4(), unit: 'ICU-2', date: relativeDate(1),
+    type: 'Major Thoracic Surgery x1', estimatedAdditionalCensus: 1,
     notes: 'Lobectomy scheduled for 0800; patient expected in ICU-2 post-op',
   },
   {
-    id: uuidv4(),
-    unit: 'MedSurg-3',
-    date: relativeDate(1),
-    type: 'Elective Joint Replacement x3',
-    estimatedAdditionalCensus: 3,
+    id: uuidv4(), unit: 'MedSurg-3', date: relativeDate(1),
+    type: 'Elective Joint Replacement x3', estimatedAdditionalCensus: 3,
     notes: 'Three hip replacements; all expected to step down to MedSurg-3',
   },
   {
-    id: uuidv4(),
-    unit: 'ICU-2',
-    date: relativeDate(2),
-    type: 'CABG Surgery x1',
-    estimatedAdditionalCensus: 1,
+    id: uuidv4(), unit: 'ICU-1', date: relativeDate(1),
+    type: 'TAVR Procedure x1', estimatedAdditionalCensus: 1,
+    notes: 'Transcatheter aortic valve replacement; ICU-1 post-op monitoring',
+  },
+  {
+    id: uuidv4(), unit: 'MedSurg-3', date: relativeDate(1),
+    type: 'Colonoscopy / Polypectomy x4', estimatedAdditionalCensus: 1,
+    notes: 'Four GI cases; one polyp removal may require overnight stay',
+  },
+
+  // ── Day +2 ─────────────────────────────────────────────────────────────
+  {
+    id: uuidv4(), unit: 'ICU-2', date: relativeDate(2),
+    type: 'CABG Surgery x1', estimatedAdditionalCensus: 1,
     notes: 'Coronary artery bypass; high acuity post-op, will need 1:1 nursing',
   },
   {
-    id: uuidv4(),
-    unit: 'MedSurg-3',
-    date: relativeDate(2),
-    type: 'Appendectomy x2',
-    estimatedAdditionalCensus: 2,
+    id: uuidv4(), unit: 'MedSurg-3', date: relativeDate(2),
+    type: 'Appendectomy x2', estimatedAdditionalCensus: 2,
     notes: 'Two laparoscopic appendectomies; routine admissions expected',
+  },
+  {
+    id: uuidv4(), unit: 'ICU-1', date: relativeDate(2),
+    type: 'Aortic Aneurysm Repair x1', estimatedAdditionalCensus: 1,
+    notes: 'Elective EVAR scheduled 0700; prolonged ICU-1 stay expected (48–72 hrs)',
+  },
+  {
+    id: uuidv4(), unit: 'MedSurg-3', date: relativeDate(2),
+    type: 'Spinal Fusion x1', estimatedAdditionalCensus: 1,
+    notes: 'L4-L5 fusion; PT/OT consult day 1, multi-day MedSurg-3 stay expected',
   },
 ];
 

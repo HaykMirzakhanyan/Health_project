@@ -52,6 +52,48 @@ async function sendSmsAlert(message) {
 }
 
 // ---------------------------------------------------------------------------
+// computeGaps
+// Deterministically calculates staffing gaps by comparing each forecast's
+// requiredStaff against the number of active (non-absent) rostered staff
+// per unit.  Also stamps scheduledStaff and gapFlag onto each forecast
+// object so the UI shows accurate gap badges without relying on the LLM.
+// ---------------------------------------------------------------------------
+function computeGaps(forecasts, staff, todaySchedule) {
+  // Count non-absent staff per unit from today's schedule
+  const activeByUnit = {};
+  todaySchedule.forEach((entry) => {
+    if (entry.status === 'absent') return;
+    activeByUnit[entry.unit] = (activeByUnit[entry.unit] || 0) + 1;
+  });
+
+  // Fall back to total roster count if today's schedule is empty
+  const rosterByUnit = {};
+  staff.forEach((s) => {
+    rosterByUnit[s.unit] = (rosterByUnit[s.unit] || 0) + 1;
+  });
+
+  const gaps = [];
+
+  forecasts.forEach((f) => {
+    const scheduled = activeByUnit[f.unit] ?? rosterByUnit[f.unit] ?? 0;
+    f.scheduledStaff = scheduled;
+    f.gapFlag        = scheduled < f.requiredStaff;
+
+    if (f.gapFlag) {
+      gaps.push({
+        unit:      f.unit,
+        date:      f.date,
+        type:      'coverage',
+        shortfall: f.requiredStaff - scheduled,
+        reason:    `Forecast requires ${f.requiredStaff} staff for ${f.unit} but only ${scheduled} are active on shift`,
+      });
+    }
+  });
+
+  return gaps;
+}
+
+// ---------------------------------------------------------------------------
 // buildHistoricalData
 // Summarises the last 30 days of shift data into per-unit, per-day-of-week
 // average census figures that the Demand Forecasting agent can reason about.
@@ -107,14 +149,17 @@ async function runOrchestrator() {
     store.forecasts = [];
   }
 
+  // ---- Step 1b: Stamp scheduledStaff + gapFlag onto forecasts deterministically
+  // (LLM does not know the real roster, so we compute this ourselves.)
+  const gaps = computeGaps(forecasts, store.staff, store.todaySchedule);
+  console.log(`[Orchestrator] Computed ${gaps.length} staffing gap(s) from roster.`);
+
   // ---- Step 2: Schedule Optimization ------------------------------------
   console.log('[Orchestrator] Step 2/4 — Running Schedule Optimizer Agent...');
   let schedule = [];
-  let gaps = [];
   try {
     const result = await runScheduleOptimizer(forecasts, store.staff);
     schedule = result.schedule;
-    gaps = result.gaps;
     store.schedule = schedule;
   } catch (err) {
     console.error('[Orchestrator] Agent 2 failed:', err.message);

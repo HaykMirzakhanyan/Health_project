@@ -21,42 +21,43 @@ const { createIntervention } = require('../data/schema');
 // @returns {Promise<Array>}   — Intervention objects (unsaved; orchestrator saves them)
 // ---------------------------------------------------------------------------
 async function runInterventionAdvisor(riskFlags, staffingGaps) {
-  const prompt = `You are a healthcare workforce intervention advisor.
-Given the following burnout risk flags and staffing gaps, recommend the most impactful actions
-a charge nurse or HR manager can take today. Be specific and actionable.
-Rank recommendations by urgency (critical first, then high, medium, low).
+  // Build an explicit roster so the LLM has no reason to invent names
+  const rosterLines = riskFlags.map((s) =>
+    `  - staffId: ${s.staffId} | name: ${s.name} | role: ${s.role || 'unknown'} | unit: ${s.unit || 'unknown'} | risk: ${s.burnoutRisk} | score: ${s.score} | factors: ${(s.contributingFactors || []).join('; ')}`
+  ).join('\n');
 
-Burnout risk flags (staff at yellow or red risk):
-${JSON.stringify(riskFlags, null, 2)}
+  const hasRiskFlags  = riskFlags.length > 0;
+  const hasGaps       = staffingGaps.length > 0;
 
-Staffing gaps (units where demand exceeds scheduled staff):
+  const prompt = `You are a healthcare workforce intervention advisor for Riverside General Hospital.
+Generate specific, actionable recommendations based on the data below.
+
+RULES — follow exactly:
+1. For individual staff recommendations, use ONLY names and staffIds from the AT-RISK STAFF ROSTER.
+2. Do NOT invent names. No "Jane Doe", no "John Smith", no placeholders.
+3. For unit-level recommendations (coverage gaps), set staffId to null and populate the unit field.
+4. You MUST produce at least one recommendation per staffing gap and one per red-risk staff member.
+
+AT-RISK STAFF ROSTER (${hasRiskFlags ? riskFlags.length + ' at-risk members' : 'none currently — focus on gaps'}):
+${rosterLines || '  (none)'}
+
+STAFFING GAPS (${hasGaps ? staffingGaps.length + ' gap(s) detected' : 'none detected'}):
 ${JSON.stringify(staffingGaps, null, 2)}
 
-For each recommendation include:
-  - staffId: UUID of the specific staff member (null if unit-level)
-  - unit: unit name (null if individual intervention)
-  - recommendation: a specific, actionable step in plain language (1-2 sentences)
+For each recommendation return:
+  - staffId: exact UUID from the roster, or null for unit-level
+  - unit: unit name, or null for individual
+  - recommendation: 1-2 sentences, specific and actionable, referencing the actual name or unit
   - urgency: "critical" | "high" | "medium" | "low"
-  - type: one of "shift_swap" | "pto" | "redistribute" | "alert_charge_nurse" | "other"
+  - type: "shift_swap" | "pto" | "redistribute" | "alert_charge_nurse" | "other"
 
 Urgency guidelines:
-  - critical: Immediate patient safety risk (gap >= 2 staff OR red-risk nurse on 6th+ consecutive shift)
-  - high: Likely to become critical within 24 hours
-  - medium: Addressable within 48 hours without immediate risk
-  - low: Preventative / wellness recommendations
+  - critical: Immediate patient safety risk (shortfall >= 2 OR red-risk staff on 6th+ consecutive shift)
+  - high: Will become critical within 24 hours
+  - medium: Addressable within 48 hours
+  - low: Preventative / wellness
 
-Return ONLY a valid JSON array. No extra commentary.
-
-Format:
-[
-  {
-    "staffId": "<uuid or null>",
-    "unit": "<unit name or null>",
-    "recommendation": "Immediately reassign Maria Santos from night shifts to day shifts for the next 7 days and schedule a mandatory wellness check-in with the charge nurse.",
-    "urgency": "critical",
-    "type": "shift_swap"
-  }
-]`;
+Return ONLY a valid JSON array. No markdown, no extra text.`;
 
   let rawResponse;
   try {

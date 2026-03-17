@@ -36,6 +36,7 @@ Instructions:
 - ICU units have a max capacity of 12 beds; MedSurg-3 has a max of 30 beds.
 - Staff ratios: ICU 1:2 (one nurse per 2 patients), MedSurg 1:5 (one nurse per 5 patients).
 - Return ONLY a valid JSON array with no extra commentary.
+- Do NOT include scheduledStaff or gapFlag — those are computed separately.
 
 Required JSON format:
 [
@@ -43,9 +44,7 @@ Required JSON format:
     "unit": "ICU-1",
     "date": "2025-01-15T00:00:00.000Z",
     "predictedCensus": 9,
-    "requiredStaff": 5,
-    "scheduledStaff": 0,
-    "gapFlag": false
+    "requiredStaff": 5
   }
 ]
 

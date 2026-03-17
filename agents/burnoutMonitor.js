@@ -103,6 +103,8 @@ Format:
     return {
       staffId: item.staffId || '',
       name: item.name || '',
+      role: staffRecord?.role || '',
+      unit: staffRecord?.unit || '',
       burnoutRisk: risk,
       contributingFactors: Array.isArray(item.contributingFactors)
         ? item.contributingFactors

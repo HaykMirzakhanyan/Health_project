@@ -317,6 +317,184 @@
     margin-right: 6px;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* VIEW TOGGLE */
+  .view-toggle { display:flex; gap:4px; }
+  .view-btn {
+    padding: 4px 12px;
+    border: 1px solid #b5c7d8;
+    background: #f0f6ff;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #1f3b57;
+    transition: background 0.15s;
+  }
+  .view-btn.active { background: #1f3b57; color: #fff; border-color: #1f3b57; }
+
+  /* DATE NAV */
+  .date-nav { display:flex; align-items:center; gap:6px; margin-left:auto; }
+  .date-nav button {
+    padding: 3px 10px;
+    border: 1px solid #b5c7d8;
+    background: #f0f6ff;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #1f3b57;
+  }
+  .date-nav button:hover { background: #dce8f5; }
+  .date-nav span {
+    font-size: 13px;
+    font-weight: bold;
+    color: #1f3b57;
+    min-width: 120px;
+    text-align: center;
+  }
+
+  /* TIMELINE */
+  .timeline-scroll {
+    overflow-y: auto;
+    overflow-x: auto;
+    flex: 1;
+    padding: 10px 16px 16px;
+  }
+
+  .tl-wrap { min-width: 680px; }
+
+  .tl-ruler {
+    display: flex;
+    margin-left: 155px;
+    border-bottom: 2px solid #1f3b57;
+    padding-bottom: 2px;
+    margin-bottom: 2px;
+  }
+
+  .tl-hour {
+    flex: 1;
+    font-size: 9px;
+    color: #6c8aa0;
+    position: relative;
+    text-align: left;
+  }
+
+  .tl-hour::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    height: 4px;
+    border-left: 1px solid #c5d8ea;
+  }
+
+  .tl-unit-header {
+    font-size: 11px;
+    font-weight: bold;
+    color: #fff;
+    background: #1f3b57;
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin: 10px 0 2px;
+  }
+
+  .tl-row {
+    display: flex;
+    align-items: center;
+    height: 34px;
+    border-bottom: 1px solid #eef3f9;
+  }
+  .tl-row:hover { background: #f5faff; }
+
+  .tl-name-col {
+    width: 155px;
+    min-width: 155px;
+    padding-right: 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .tl-name {
+    font-size: 12px;
+    font-weight: bold;
+    color: #1f3b57;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tl-role-unit {
+    font-size: 10px;
+    color: #888;
+    white-space: nowrap;
+  }
+
+  .tl-bar-area {
+    flex: 1;
+    position: relative;
+    height: 20px;
+    background: #f0f6ff;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .tl-grid {
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      to right,
+      transparent,
+      transparent calc(100% / 24 - 1px),
+      #dde8f5 calc(100% / 24 - 1px),
+      #dde8f5 calc(100% / 24)
+    );
+    pointer-events: none;
+  }
+
+  .tl-bar {
+    position: absolute;
+    top: 2px;
+    height: 16px;
+    border-radius: 3px;
+    opacity: 0.82;
+    cursor: default;
+    transition: opacity 0.15s;
+  }
+  .tl-bar:hover { opacity: 1; }
+  .tl-bar.shift-day     { background: #27ae60; }
+  .tl-bar.shift-evening { background: #e67e22; }
+  .tl-bar.shift-night   { background: #2980b9; }
+  .tl-bar.shift-absent  { background: #e74c3c; opacity: 0.35; }
+
+  .tl-now-line {
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    width: 2px;
+    background: #e74c3c;
+    z-index: 3;
+    pointer-events: none;
+  }
+
+  .tl-legend {
+    display: flex;
+    gap: 14px;
+    margin: 6px 0 4px 155px;
+    flex-wrap: wrap;
+  }
+  .tl-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: #555;
+  }
+  .tl-legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+  }
 </style>
 </head>
 
@@ -335,16 +513,29 @@
   <!-- LEFT: SCHEDULE GRID -->
   <div class="left-panel">
     <div class="panel-header">
-      <h2>Today's Schedule</h2>
-      <div class="unit-tabs" id="unitTabs">
-        <button class="tab-btn active" onclick="switchUnit('all', this)">All Units</button>
-        <button class="tab-btn" onclick="switchUnit('ICU-1', this)">ICU-1</button>
-        <button class="tab-btn" onclick="switchUnit('ICU-2', this)">ICU-2</button>
-        <button class="tab-btn" onclick="switchUnit('MedSurg-3', this)">MedSurg-3</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <h2 id="scheduleTitle" style="margin:0;font-size:17px;color:#1f3b57;">Today's Schedule</h2>
+        <div class="view-toggle">
+          <button class="view-btn active" id="btnTable"    onclick="switchView('table')">Table</button>
+          <button class="view-btn"        id="btnTimeline" onclick="switchView('timeline')">Timeline</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div class="unit-tabs" id="unitTabs">
+          <button class="tab-btn active" onclick="switchUnit('all', this)">All Units</button>
+          <button class="tab-btn" onclick="switchUnit('ICU-1', this)">ICU-1</button>
+          <button class="tab-btn" onclick="switchUnit('ICU-2', this)">ICU-2</button>
+          <button class="tab-btn" onclick="switchUnit('MedSurg-3', this)">MedSurg-3</button>
+        </div>
+        <div class="date-nav" id="dateNav" style="display:none;">
+          <button onclick="changeDate(-1)">&#9664;</button>
+          <span id="dateDisplay">Today</span>
+          <button onclick="changeDate(1)">&#9654;</button>
+        </div>
       </div>
     </div>
 
-    <div class="schedule-scroll">
+    <div class="schedule-scroll" id="tableView">
       <table id="scheduleTable">
         <thead>
           <tr>
@@ -360,6 +551,12 @@
           <tr><td colspan="6" class="no-data" style="padding:20px;">Loading schedule…</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <div class="timeline-scroll" id="timelineView" style="display:none;">
+      <div class="tl-wrap" id="tlContent">
+        <p class="no-data" style="padding:20px;">Switch to Timeline view to load.</p>
+      </div>
     </div>
   </div>
 
@@ -403,7 +600,10 @@
 
   let allSchedule = [];
   let allStaff    = [];
-  let currentUnit = 'all';
+  let currentUnit  = 'all';
+  let currentView  = 'table';
+  let timelineDate = new Date();
+  timelineDate.setHours(0, 0, 0, 0);
 
   /* LIVE CLOCK */
   function startClock() {
@@ -459,7 +659,8 @@
     currentUnit = unit;
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    renderSchedule();
+    if (currentView === 'table') renderSchedule();
+    else renderTimeline();
   }
 
   // ── SCHEDULE TABLE ─────────────────────────────────────
@@ -700,6 +901,164 @@
 
     btn.disabled = false;
     btn.innerHTML = 'Run AI Analysis';
+  }
+
+  // ── TIMELINE VIEW ────────────────────────────────────────
+
+  function switchView(view) {
+    currentView = view;
+    document.getElementById('btnTable').classList.toggle('active',    view === 'table');
+    document.getElementById('btnTimeline').classList.toggle('active', view === 'timeline');
+    document.getElementById('tableView').style.display    = view === 'table'    ? '' : 'none';
+    document.getElementById('timelineView').style.display = view === 'timeline' ? '' : 'none';
+    document.getElementById('dateNav').style.display      = view === 'timeline' ? 'flex' : 'none';
+    if (view === 'timeline') renderTimeline();
+  }
+
+  function changeDate(delta) {
+    const d = new Date(timelineDate);
+    d.setDate(d.getDate() + delta);
+    // Don't go beyond today or more than 31 days back
+    const today = new Date(); today.setHours(0,0,0,0);
+    if (d > today) return;
+    timelineDate = d;
+    renderTimeline();
+  }
+
+  function formatDateDisplay(date) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const diff  = Math.round((date - today) / 86400000);
+    if (diff === 0) return 'Today';
+    if (diff === -1) return 'Yesterday';
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+
+  function toFrac(t) {
+    const [h, m] = t.split(':').map(Number);
+    return (h * 60 + (m || 0)) / 1440;
+  }
+
+  function buildShiftBars(shiftStart, shiftEnd, shiftType, isAbsent) {
+    if (!shiftStart || !shiftEnd) return '';
+    const cls    = isAbsent ? 'shift-absent' : `shift-${shiftType}`;
+    const sFrac  = toFrac(shiftStart);
+    const eFrac  = toFrac(shiftEnd);
+    const title  = `${shiftStart}–${shiftEnd}`;
+
+    if (eFrac > sFrac) {
+      const left  = (sFrac * 100).toFixed(3);
+      const width = ((eFrac - sFrac) * 100).toFixed(3);
+      return `<div class="tl-bar ${cls}" style="left:${left}%;width:${width}%" title="${title}"></div>`;
+    }
+    // Overnight — two segments
+    const w1 = ((1 - sFrac) * 100).toFixed(3);
+    const w2 = (eFrac * 100).toFixed(3);
+    return `
+      <div class="tl-bar ${cls}" style="left:${(sFrac*100).toFixed(3)}%;width:${w1}%" title="${shiftStart}–00:00"></div>
+      <div class="tl-bar ${cls}" style="left:0%;width:${w2}%" title="00:00–${shiftEnd}"></div>`;
+  }
+
+  async function renderTimeline() {
+    const content = document.getElementById('tlContent');
+    const dateStr = timelineDate.toISOString().split('T')[0];
+    const today   = new Date().toISOString().split('T')[0];
+    const isToday = dateStr === today;
+
+    document.getElementById('dateDisplay').textContent = formatDateDisplay(timelineDate);
+    document.getElementById('scheduleTitle').textContent =
+      isToday ? "Today's Schedule" : formatDateDisplay(timelineDate) + ' Schedule';
+
+    content.innerHTML = '<p class="no-data" style="padding:20px;">Loading…</p>';
+
+    try {
+      const res     = await fetch(`/api/timeline?date=${dateStr}`);
+      const entries = res.ok ? await res.json() : [];
+
+      if (!entries.length) {
+        content.innerHTML = '<p class="no-data" style="padding:20px;">No schedule data for this date.</p>';
+        return;
+      }
+
+      const sentHomeIds = getSentHomeIds();
+      const filtered    = currentUnit === 'all' ? entries : entries.filter(e => e.unit === currentUnit);
+
+      // Group by unit
+      const grouped = {};
+      filtered.forEach(e => {
+        if (!grouped[e.unit]) grouped[e.unit] = [];
+        grouped[e.unit].push(e);
+      });
+
+      // Now-line position
+      const nowPct = (() => {
+        if (!isToday) return null;
+        const n = new Date();
+        return ((n.getHours() * 60 + n.getMinutes()) / 1440 * 100).toFixed(3);
+      })();
+
+      // Hour ruler (0–23)
+      const ruler = Array.from({ length: 24 }, (_, i) =>
+        `<div class="tl-hour">${String(i).padStart(2, '0')}</div>`
+      ).join('');
+
+      // Legend
+      const legend = `
+        <div class="tl-legend">
+          <div class="tl-legend-item"><div class="tl-legend-dot" style="background:#27ae60"></div>Day (07–19)</div>
+          <div class="tl-legend-item"><div class="tl-legend-dot" style="background:#e67e22"></div>Evening (15–03)</div>
+          <div class="tl-legend-item"><div class="tl-legend-dot" style="background:#2980b9"></div>Night (19–07)</div>
+          <div class="tl-legend-item"><div class="tl-legend-dot" style="background:#e74c3c;opacity:0.4"></div>Absent/Off</div>
+          ${isToday ? '<div class="tl-legend-item"><div class="tl-legend-dot" style="background:#e74c3c;width:3px;border-radius:0"></div>Now</div>' : ''}
+        </div>`;
+
+      const unitsToShow = currentUnit === 'all' ? ['ICU-1', 'ICU-2', 'MedSurg-3'] : [currentUnit];
+
+      let rows = '';
+      unitsToShow.forEach(unit => {
+        const unitRows = grouped[unit];
+        if (!unitRows || !unitRows.length) return;
+
+        rows += `<div class="tl-unit-header">${unit}</div>`;
+
+        unitRows.forEach(entry => {
+          const isOff  = sentHomeIds.has(entry.staffId) || entry.status === 'absent';
+          const bars   = buildShiftBars(entry.shiftStart, entry.shiftEnd, entry.shiftType, isOff);
+          const nowLine = nowPct !== null
+            ? `<div class="tl-now-line" style="left:${nowPct}%"></div>` : '';
+
+          rows += `
+            <div class="tl-row">
+              <div class="tl-name-col">
+                <span class="tl-name">${entry.staffName}</span>
+                <span class="tl-role-unit">${entry.role} · ${entry.unit}</span>
+              </div>
+              <div class="tl-bar-area">
+                <div class="tl-grid"></div>
+                ${nowLine}
+                ${bars}
+              </div>
+            </div>`;
+        });
+      });
+
+      content.innerHTML = `
+        <div class="tl-ruler">${ruler}</div>
+        ${legend}
+        ${rows}`;
+
+      // Keep now-line in sync every minute
+      if (isToday) {
+        clearInterval(window._tlInterval);
+        window._tlInterval = setInterval(() => {
+          const n   = new Date();
+          const pct = ((n.getHours() * 60 + n.getMinutes()) / 1440 * 100).toFixed(3);
+          document.querySelectorAll('.tl-now-line').forEach(el => { el.style.left = pct + '%'; });
+        }, 60000);
+      }
+
+    } catch (err) {
+      content.innerHTML = `<p class="no-data" style="padding:20px;color:#e74c3c;">Error: ${err.message}</p>`;
+    }
   }
 
   // ── INITIAL LOAD ─────────────────────────────────────────

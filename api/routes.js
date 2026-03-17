@@ -399,4 +399,66 @@ router.post('/checkin/:staffId', (req, res) => {
   }
 });
 
+// ===========================================================================
+// Timeline
+// ===========================================================================
+
+/**
+ * GET /api/timeline?date=YYYY-MM-DD
+ * Returns shift entries for the requested date, shaped for the timeline view.
+ * Uses todaySchedule for today; falls back to historical store.shifts for past dates.
+ */
+router.get('/timeline', (req, res) => {
+  try {
+    const SHIFT_TIMES = {
+      day:     { start: '07:00', end: '19:00' },
+      evening: { start: '15:00', end: '03:00' },
+      night:   { start: '19:00', end: '07:00' },
+    };
+
+    const today   = new Date().toISOString().split('T')[0];
+    const dateStr = req.query.date || today;
+
+    if (dateStr === today) {
+      return res.json(
+        store.todaySchedule.map((e) => ({
+          staffId:    e.staffId,
+          staffName:  e.staffName,
+          role:       e.role,
+          unit:       e.unit,
+          shiftStart: e.shiftStart,
+          shiftEnd:   e.shiftEnd,
+          shiftType:  e.shiftType,
+          status:     e.status,
+        }))
+      );
+    }
+
+    // Historical date — use store.shifts
+    const staffMap = {};
+    store.staff.forEach((s) => { staffMap[s.id] = s; });
+
+    const entries = store.shifts
+      .filter((s) => s.date && s.date.startsWith(dateStr))
+      .map((s) => {
+        const member = staffMap[s.staffId] || {};
+        const times  = SHIFT_TIMES[s.type] || SHIFT_TIMES.day;
+        return {
+          staffId:    s.staffId,
+          staffName:  member.name  || 'Unknown',
+          role:       member.role  || '—',
+          unit:       s.unit,
+          shiftStart: times.start,
+          shiftEnd:   times.end,
+          shiftType:  s.type,
+          status:     'completed',
+        };
+      });
+
+    res.json(entries);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
