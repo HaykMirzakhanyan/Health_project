@@ -39,10 +39,14 @@ async function runScheduleOptimizer(forecasts, staff, scheduleEntries = []) {
     forecasts.map((f) => (f.date ? f.date.split('T')[0] : null)).filter(Boolean)
   );
 
-  // Filter schedule entries to just the forecast window; omit absent staff
-  const relevantEntries = scheduleEntries.filter(
+  // Filter schedule entries to just the forecast window; omit absent staff.
+  // Fall back to all non-absent entries if none match (e.g. date mismatch).
+  const inWindow = scheduleEntries.filter(
     (e) => forecastDates.has(e.date) && e.status !== 'absent'
   );
+  const relevantEntries = inWindow.length > 0
+    ? inWindow
+    : scheduleEntries.filter((e) => e.status !== 'absent');
 
   // Lean summaries to keep token usage low
   const entrySummary = relevantEntries.map((e) => ({
@@ -84,7 +88,13 @@ Additional labour rules:
   - Maximum 5 consecutive shifts per staff member.
   - Minimum 8 hours rest between shifts.
   - ICU units require ACLS or CCRN certification; MedSurg-3 requires BLS minimum.
-  - Prefer staff with lower burnoutRisk for shift changes; avoid switching red-risk staff to night.
+  - HARD RULE — burnout constraints (non-negotiable):
+      * Do NOT reassign or change the shift of any staff member with burnoutRisk = "red".
+        If the only available staff for a gap are red-risk, record the gap instead.
+      * Avoid reassigning staff with burnoutRisk = "yellow" unless no green-risk staff
+        are available in the same unit. If yellow-risk staff must be used, prefer day shifts
+        over night shifts and note the reason.
+      * Always prefer staff with burnoutRisk = "green" for any shift change.
   - Only change staff assigned to the same unit as the gap — do NOT move staff across units.
   - Only reference entry IDs from the schedule below — do NOT invent new IDs.
 
@@ -223,7 +233,10 @@ ${JSON.stringify(staffSummary, null, 2)}
 RULES:
 - Prioritize urgent and high-priority patients first.
 - Match patients to staff in the same unit.
-- Avoid assigning extra patients to red-risk or high-burnout staff.
+- HARD RULE — burnout constraints (non-negotiable):
+    * Do NOT assign shift changes or extra patients to staff with burnoutRisk = "red".
+    * Avoid assigning yellow-risk staff unless no green-risk staff are available in the unit.
+    * Always prefer green-risk staff for any new assignment or shift change.
 - Suggest shift type changes (day/evening/night) only if it improves coverage.
 - ICU staff ratio: 1:2 (one nurse per 2 patients). MedSurg ratio: 1:5.
 - Only reference staff and patients from the data above — no invented names.

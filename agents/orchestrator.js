@@ -158,8 +158,21 @@ async function runOrchestrator() {
   const gaps = computeGaps(forecasts, store.staff, store.todaySchedule);
   console.log(`[Orchestrator] Computed ${gaps.length} staffing gap(s) from roster.`);
 
-  // ---- Step 2: Schedule Optimization ------------------------------------
-  console.log('[Orchestrator] Step 2/4 — Running Schedule Optimizer Agent...');
+  // ---- Step 2: Burnout Monitoring (moved before optimizer so fresh risk data
+  //             is available when the schedule optimizer selects staff) -------
+  console.log('[Orchestrator] Step 2/4 — Running Burnout Monitor Agent...');
+  let burnoutScores = [];
+  try {
+    burnoutScores = await runBurnoutMonitor(store.staff);
+    store.burnoutScores = burnoutScores;
+    // burnoutMonitor writes updated burnoutRisk back to each store.staff record
+  } catch (err) {
+    console.error('[Orchestrator] Agent 2 failed:', err.message);
+    store.burnoutScores = [];
+  }
+
+  // ---- Step 3: Schedule Optimization (now has up-to-date burnout risk) ----
+  console.log('[Orchestrator] Step 3/4 — Running Schedule Optimizer Agent...');
   const combinedScheduleForOptimizer = [
     ...(store.todaySchedule || []),
     ...(store.futureSchedule || []),
@@ -196,23 +209,12 @@ async function runOrchestrator() {
 
     console.log(`[Orchestrator] Schedule Optimizer identified ${optimizerGaps.length} unresolvable gap(s).`);
   } catch (err) {
-    console.error('[Orchestrator] Agent 2 failed:', err.message);
+    console.error('[Orchestrator] Agent 3 failed:', err.message);
     store.schedule = [];
   }
 
-  // ---- Step 3: Burnout Monitoring ----------------------------------------
-  console.log('[Orchestrator] Step 3/4 — Running Burnout Monitor Agent...');
-  let burnoutScores = [];
-  try {
-    burnoutScores = await runBurnoutMonitor(store.staff);
-    store.burnoutScores = burnoutScores;
-  } catch (err) {
-    console.error('[Orchestrator] Agent 3 failed:', err.message);
-    store.burnoutScores = [];
-  }
-
   // ---- Step 4: Intervention Recommendations --------------------------------
-  console.log('[Orchestrator] Step 4/4 — Running Intervention Advisor Agent...');
+  console.log('[Orchestrator] Step 4/4 — Running Intervention Advisor Agent (uses burnout from Step 2)...');
   const riskFlags = burnoutScores.filter((s) => s.burnoutRisk !== 'green');
   let interventions = [];
   try {

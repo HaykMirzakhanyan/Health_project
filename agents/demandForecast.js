@@ -21,6 +21,15 @@ const { createForecast } = require('../data/schema');
 // @returns {Promise<Array>}            — Array of Forecast objects (next 3 days)
 // ---------------------------------------------------------------------------
 async function runDemandForecast(historicalData, scheduledProcedures, scheduleData = []) {
+  // Compute the actual next 3 forecast dates so the LLM uses real dates
+  const today = new Date();
+  const forecastDates = [0, 1, 2].map((offset) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() + offset);
+    return d.toISOString().split('T')[0]; // YYYY-MM-DD
+  });
+  const forecastDateISOs = forecastDates.map((d) => `${d}T00:00:00.000Z`);
+
   // Summarise scheduled staff counts by unit and shift type for the prompt
   const scheduleSummary = {};
   for (const entry of scheduleData) {
@@ -49,6 +58,7 @@ ${JSON.stringify(scheduleSummary, null, 2)}
 
 Instructions:
 - Forecast for each of the 3 units (ICU-1, ICU-2, MedSurg-3) for each of the next 3 days.
+- Use EXACTLY these dates (in order): Day 1 = "${forecastDateISOs[0]}", Day 2 = "${forecastDateISOs[1]}", Day 3 = "${forecastDateISOs[2]}".
 - Account for day-of-week patterns and the additional census from scheduled procedures.
 - ICU units have a max capacity of 12 beds; MedSurg-3 has a max of 30 beds.
 - Staff ratios: ICU 1:2 (one nurse per 2 patients), MedSurg 1:5 (one nurse per 5 patients).
@@ -77,7 +87,7 @@ Required JSON format:
 [
   {
     "unit": "ICU-1",
-    "date": "2025-01-15T00:00:00.000Z",
+    "date": "${forecastDateISOs[0]}",
     "predictedCensus": 9,
     "requiredStaff": 5,
     "status": "ok"
@@ -106,11 +116,19 @@ Generate 9 forecast objects total (3 units × 3 days).`;
     throw new Error('[DemandForecast] Expected JSON array from LLM, got: ' + typeof parsed);
   }
 
+  // Remap LLM-returned dates to real dates by relative order.
+  // The LLM may hallucinate old dates (e.g. 2025), so we sort the unique dates
+  // it produced, then substitute our actual forecastDates in the same order.
+  const llmDatesSorted = [...new Set(parsed.map((i) => i.date).filter(Boolean))].sort();
+  const dateRemap = new Map(
+    llmDatesSorted.map((d, idx) => [d, forecastDateISOs[idx] ?? forecastDateISOs[0]])
+  );
+
   // Normalise into Forecast schema objects
   const forecasts = parsed.map((item) =>
     createForecast({
       unit: item.unit || '',
-      date: item.date || new Date().toISOString(),
+      date: dateRemap.get(item.date) || forecastDateISOs[0],
       predictedCensus: Number(item.predictedCensus) || 0,
       requiredStaff: Number(item.requiredStaff) || 0,
       scheduledStaff: Number(item.scheduledStaff) || 0,

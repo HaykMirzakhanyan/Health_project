@@ -37,6 +37,12 @@ RULES — follow exactly:
 2. Do NOT invent names. No "Jane Doe", no "John Smith", no placeholders.
 3. For unit-level recommendations (coverage gaps), set staffId to null and populate the unit field.
 4. You MUST produce at least one recommendation per staffing gap and one per red-risk staff member.
+5. For EVERY at-risk staff member (yellow or red), you MUST produce a fatigue prevention tip as a
+   separate recommendation item with type "fatigue_prevention" that directly addresses their specific
+   contributing factors (e.g. too many night shifts → recommend sleep hygiene; high hours → mandatory
+   rest day; low wellness score → mental health check-in; no recent PTO → schedule time off).
+   - RED risk: fatigue tip urgency = "high"
+   - YELLOW risk: fatigue tip urgency = "medium"
 
 AT-RISK STAFF ROSTER (${hasRiskFlags ? riskFlags.length + ' at-risk members' : 'none currently — focus on gaps'}):
 ${rosterLines || '  (none)'}
@@ -49,13 +55,13 @@ For each recommendation return:
   - unit: unit name, or null for individual
   - recommendation: 1-2 sentences, specific and actionable, referencing the actual name or unit
   - urgency: "critical" | "high" | "medium" | "low"
-  - type: "shift_swap" | "pto" | "redistribute" | "alert_charge_nurse" | "other"
+  - type: "shift_swap" | "pto" | "redistribute" | "alert_charge_nurse" | "fatigue_prevention" | "other"
 
 Urgency guidelines:
   - critical: Immediate patient safety risk (shortfall >= 2 OR red-risk staff on 6th+ consecutive shift)
-  - high: Will become critical within 24 hours
-  - medium: Addressable within 48 hours
-  - low: Preventative / wellness
+  - high: Will become critical within 24 hours; also use for red-risk fatigue prevention tips
+  - medium: Addressable within 48 hours; also use for yellow-risk fatigue prevention tips
+  - low: Preventative / wellness (green staff proactive tips only)
 
 Return ONLY a valid JSON array. No markdown, no extra text.`;
 
@@ -79,7 +85,7 @@ Return ONLY a valid JSON array. No markdown, no extra text.`;
     throw new Error('[InterventionAdvisor] Expected JSON array from LLM, got: ' + typeof parsed);
   }
 
-  const validTypes = ['shift_swap', 'pto', 'redistribute', 'alert_charge_nurse', 'other'];
+  const validTypes = ['shift_swap', 'pto', 'redistribute', 'alert_charge_nurse', 'fatigue_prevention', 'other'];
   const validUrgencies = ['low', 'medium', 'high', 'critical'];
 
   const interventions = parsed.map((item) =>

@@ -285,6 +285,9 @@
   .urgency-label.medium   { background: #fff3cd; color: #856404; }
   .urgency-label.low      { background: #d4edda; color: #155724; }
 
+  .intervention-item.fatigue { border-color: #8e44ad; background: #fdf6ff; }
+  .urgency-label.fatigue { background: #e8d5f5; color: #5b2c7e; }
+
   .approve-btn {
     margin-top: 5px;
     padding: 3px 10px;
@@ -1167,8 +1170,13 @@
       return;
     }
 
-    el.innerHTML = interventions.map(item => `
-      <div class="intervention-item ${item.urgency}" id="intervention-${item.id}">
+    el.innerHTML = interventions.map(item => {
+      const isFatigue = item.type === 'fatigue_prevention';
+      const cardClass = isFatigue ? 'fatigue' : item.urgency;
+      const label     = isFatigue ? '🧠 Fatigue Prevention' : item.urgency;
+      const labelClass = isFatigue ? 'fatigue' : item.urgency;
+      return `
+      <div class="intervention-item ${cardClass}" id="intervention-${item.id}">
         <div class="intervention-text">
           ${item.recommendation}
           <br>
@@ -1178,8 +1186,9 @@
             ${item.approved ? '✓ Approved' : 'Approve'}
           </button>
         </div>
-        <span class="urgency-label ${item.urgency}">${item.urgency}</span>
-      </div>`).join('');
+        <span class="urgency-label ${labelClass}">${label}</span>
+      </div>`;
+    }).join('');
   }
 
   // ── APPROVE INTERVENTION ────────────────────────────────
