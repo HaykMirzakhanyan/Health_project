@@ -126,6 +126,9 @@
     flex-direction: column;
     gap: 16px;
     overflow-y: auto;
+    min-height: 0;
+    height: calc(100vh - 50px);
+    box-sizing: border-box;
   }
 
   .info-box,
@@ -437,6 +440,30 @@
     }
     tick();
     setInterval(tick, 1000);
+  }
+
+  /* HOURS OFF-SHIFT — returns 0 while on shift, hours elapsed since shift end otherwise */
+  function calcHoursOffShift(start24, end24) {
+    if (!start24 || !end24) return 0;
+    const toMins = t => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0); };
+    const now = new Date();
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+    const s = toMins(start24), e = toMins(end24);
+    if (e > s) {
+      if (nowMins < e) return 0;
+      return (nowMins - e) / 60;
+    }
+    // Overnight shift
+    if (nowMins >= s || nowMins < e) return 0;
+    return (nowMins - e) / 60;
+  }
+
+  function applyBurnoutRecovery(risk, start24, end24) {
+    if (!risk || risk === 'green') return risk;
+    const off = calcHoursOffShift(start24, end24);
+    if (off >= 10) return 'green';
+    if (off >= 6 && risk === 'red') return 'yellow';
+    return risk;
   }
 
   /* LIVE HOURS CALCULATION */
@@ -846,6 +873,12 @@
           return score >= 5 ? 'red' : score >= 2 ? 'yellow' : 'green';
         })();
 
+        const recoveredRisk = applyBurnoutRecovery(
+          member.burnoutRisk || liveRisk,
+          sched.shiftStart,
+          sched.shiftEnd
+        );
+
         doctorInfo[member.name] = {
           staffId:      member.id,
           unit:         member.unit,
@@ -856,7 +889,7 @@
           shiftStart24: sched.shiftStart || '',
           shiftEnd24:   sched.shiftEnd   || '',
           shiftHours,
-          burnoutRisk: member.burnoutRisk || liveRisk,
+          burnoutRisk: recoveredRisk,
           // Rich appointment objects for the detail panel
           appointments: memberAppts.map(a => ({
             patient: a.patientName,

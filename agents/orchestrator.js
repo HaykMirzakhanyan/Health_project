@@ -140,7 +140,11 @@ async function runOrchestrator() {
 
   let forecasts;
   try {
-    forecasts = await runDemandForecast(historicalData, scheduledProcedures);
+    const combinedSchedule = [
+      ...(store.todaySchedule || []),
+      ...(store.futureSchedule || []),
+    ];
+    forecasts = await runDemandForecast(historicalData, scheduledProcedures, combinedSchedule);
     store.forecasts = forecasts;
   } catch (err) {
     console.error('[Orchestrator] Agent 1 failed:', err.message);
@@ -156,11 +160,41 @@ async function runOrchestrator() {
 
   // ---- Step 2: Schedule Optimization ------------------------------------
   console.log('[Orchestrator] Step 2/4 — Running Schedule Optimizer Agent...');
-  let schedule = [];
+  const combinedScheduleForOptimizer = [
+    ...(store.todaySchedule || []),
+    ...(store.futureSchedule || []),
+  ];
+  let optimizerGaps = [];
   try {
-    const result = await runScheduleOptimizer(forecasts, store.staff);
-    schedule = result.schedule;
-    store.schedule = schedule;
+    const result = await runScheduleOptimizer(forecasts, store.staff, combinedScheduleForOptimizer);
+    optimizerGaps = result.gaps || [];
+    store.schedule = result.scheduleUpdates || [];
+
+    // Apply schedule updates back to the live todaySchedule and futureSchedule
+    if (result.scheduleUpdates && result.scheduleUpdates.length > 0) {
+      const updateMap = new Map(result.scheduleUpdates.map((u) => [u.id, u]));
+
+      const applyUpdates = (entries) =>
+        entries.map((entry) => {
+          const patch = updateMap.get(entry.id);
+          if (!patch) return entry;
+          return {
+            ...entry,
+            shiftType:  patch.shiftType,
+            shiftStart: patch.shiftStart,
+            shiftEnd:   patch.shiftEnd,
+          };
+        });
+
+      store.todaySchedule  = applyUpdates(store.todaySchedule || []);
+      store.futureSchedule = applyUpdates(store.futureSchedule || []);
+
+      console.log(
+        `[Orchestrator] Applied ${result.scheduleUpdates.length} schedule update(s) to live schedule.`
+      );
+    }
+
+    console.log(`[Orchestrator] Schedule Optimizer identified ${optimizerGaps.length} unresolvable gap(s).`);
   } catch (err) {
     console.error('[Orchestrator] Agent 2 failed:', err.message);
     store.schedule = [];

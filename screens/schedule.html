@@ -936,6 +936,29 @@
     return `<strong style="color:${color};">${hours.toFixed(2)} hrs</strong>`;
   }
 
+  /* BURNOUT RECOVERY — reduces risk after 6 hrs off (red→yellow) or 10 hrs off (→green) */
+  function calcHoursOffShift(start24, end24) {
+    if (!start24 || !end24) return 0;
+    const toMins = t => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0); };
+    const now = new Date();
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+    const s = toMins(start24), e = toMins(end24);
+    if (e > s) {
+      if (nowMins < e) return 0;
+      return (nowMins - e) / 60;
+    }
+    if (nowMins >= s || nowMins < e) return 0;
+    return (nowMins - e) / 60;
+  }
+
+  function applyBurnoutRecovery(risk, start24, end24) {
+    if (!risk || risk === 'green') return risk;
+    const off = calcHoursOffShift(start24, end24);
+    if (off >= 10) return 'green';
+    if (off >= 6 && risk === 'red') return 'yellow';
+    return risk;
+  }
+
   /**
    * Dynamically scores burnout risk using today's hours plus chronic factors.
    * Returns { level: 'green'|'yellow'|'red', factors: string[] }
@@ -979,11 +1002,12 @@
     return { level, factors };
   }
 
-  function riskCell(hoursToday, member) {
+  function riskCell(hoursToday, member, shiftStart24, shiftEnd24) {
     // If agent hasn't run yet, fall back to live calculation from staff metrics
     const agentRisk = member.burnoutRisk;
     const { level, factors } = calcLiveRisk(hoursToday, member);
-    const displayLevel = agentRisk || level;
+    const rawLevel = agentRisk || level;
+    const displayLevel = applyBurnoutRecovery(rawLevel, shiftStart24, shiftEnd24);
     const colors = { green: '#27ae60', yellow: '#d4a017', red: '#e74c3c' };
     const color  = colors[displayLevel] || '#aaa';
     const label  = displayLevel.charAt(0).toUpperCase() + displayLevel.slice(1);
@@ -1027,7 +1051,7 @@
           <td>${entry.unit}</td>
           <td>${shiftCell}</td>
           <td>${isOffShift ? '<span style="color:#999;">—</span>' : hoursBar(hours)}</td>
-          <td style="line-height:1.6;">${isOffShift ? '<span style="color:#999;font-size:12px;">Sent home</span>' : riskCell(hours, member)}</td>
+          <td style="line-height:1.6;">${isOffShift ? '<span style="color:#999;font-size:12px;">Sent home</span>' : riskCell(hours, member, entry.shiftStart, entry.shiftEnd)}</td>
         </tr>`;
     }).join('');
   }

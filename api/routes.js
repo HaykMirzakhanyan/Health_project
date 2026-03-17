@@ -58,13 +58,57 @@ router.post('/orchestrator/run', async (req, res) => {
 // Staff
 // ===========================================================================
 
+// ---------------------------------------------------------------------------
+// Burnout recovery helper
+// Returns hours a staff member has been off-shift (0 if currently on shift).
+// ---------------------------------------------------------------------------
+function hoursOffShift(start24, end24) {
+  if (!start24 || !end24) return 0;
+  const toMins = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0); };
+  const now     = new Date();
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  const s = toMins(start24);
+  const e = toMins(end24);
+  if (e > s) {
+    // Normal shift (e.g. 07:00–19:00) — off when clock has passed end
+    if (nowMins < e) return 0;
+    return (nowMins - e) / 60;
+  }
+  // Overnight shift (e.g. 19:00–07:00) — on shift when now >= start OR now < end
+  if (nowMins >= s || nowMins < e) return 0;
+  return (nowMins - e) / 60;
+}
+
+function applyBurnoutRecovery(risk, start24, end24) {
+  if (!risk || risk === 'green') return risk;
+  const off = hoursOffShift(start24, end24);
+  if (off >= 10) return 'green';
+  if (off >= 6 && risk === 'red') return 'yellow';
+  return risk;
+}
+
 /**
  * GET /api/staff
- * Returns all staff members.
+ * Returns all staff members with burnout risk adjusted for time off-shift.
+ * Red → yellow after 6 hrs off; any risk → green after 10 hrs off.
  */
 router.get('/staff', (req, res) => {
   try {
-    res.json(store.staff);
+    // Index today's schedule by staffId for quick lookup
+    const schedMap = {};
+    (store.todaySchedule || []).forEach((e) => {
+      if (e.staffId) schedMap[e.staffId] = e;
+    });
+
+    const staff = store.staff.map((member) => {
+      const sched = schedMap[member.id];
+      if (!sched || !member.burnoutRisk) return member;
+      const recovered = applyBurnoutRecovery(member.burnoutRisk, sched.shiftStart, sched.shiftEnd);
+      if (recovered === member.burnoutRisk) return member;
+      return { ...member, burnoutRisk: recovered };
+    });
+
+    res.json(staff);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

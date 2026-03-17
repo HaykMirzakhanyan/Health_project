@@ -10,73 +10,127 @@
 'use strict';
 
 const { generateText, parseJSON } = require('../config/watsonx');
-const { createShift } = require('../data/schema');
+
+// Shift start/end times keyed by shift type
+const SHIFT_TIMES = {
+  day:     { shiftStart: '07:00', shiftEnd: '19:00' },
+  evening: { shiftStart: '15:00', shiftEnd: '03:00' },
+  night:   { shiftStart: '19:00', shiftEnd: '07:00' },
+};
 
 // ---------------------------------------------------------------------------
 // runScheduleOptimizer
 //
-// @param {Array} forecasts — Forecast objects from Agent 1
-// @param {Array} staff     — Current staff roster from store.staff
-// @returns {Promise<{schedule: Array, gaps: Array}>}
+// Analyses forecast coverage gaps and edits the live schedule entries to
+// satisfy minimum staffing requirements.
+//
+// @param {Array} forecasts       — Forecast objects from Agent 1 (with status field)
+// @param {Array} staff           — Current staff roster from store.staff
+// @param {Array} scheduleEntries — Combined todaySchedule + futureSchedule entries
+//                                  (only the next 3 days are sent to the LLM)
+// @returns {Promise<{scheduleUpdates: Array, gaps: Array}>}
+//   scheduleUpdates: patches to apply to the live schedule — { id, shiftType,
+//                    shiftStart, shiftEnd, reason }
+//   gaps:           shortfalls that cannot be resolved with available staff
 // ---------------------------------------------------------------------------
-async function runScheduleOptimizer(forecasts, staff) {
-  // Build a lean staff summary to keep the prompt concise
-  const staffSummary = staff.map((s) => ({
-    id: s.id,
-    name: s.name,
-    role: s.role,
-    unit: s.unit,
-    certifications: s.certifications,
-    shiftsLast14Days: s.shiftsLast14Days,
-    hoursLast30Days: s.hoursLast30Days,
-    burnoutRisk: s.burnoutRisk,
-    wellnessScore: s.wellnessScore,
+async function runScheduleOptimizer(forecasts, staff, scheduleEntries = []) {
+  // Derive the date window from the forecasts (next 3 days)
+  const forecastDates = new Set(
+    forecasts.map((f) => (f.date ? f.date.split('T')[0] : null)).filter(Boolean)
+  );
+
+  // Filter schedule entries to just the forecast window; omit absent staff
+  const relevantEntries = scheduleEntries.filter(
+    (e) => forecastDates.has(e.date) && e.status !== 'absent'
+  );
+
+  // Lean summaries to keep token usage low
+  const entrySummary = relevantEntries.map((e) => ({
+    id:        e.id,
+    staffId:   e.staffId,
+    staffName: e.staffName,
+    role:      e.role,
+    unit:      e.unit,
+    date:      e.date,
+    shiftType: e.shiftType,
+    status:    e.status,
   }));
 
-  const prompt = `You are a healthcare schedule optimization agent.
-Given the following demand forecasts and staff availability, generate an optimized shift schedule
-for the next 72 hours. Apply the following labor rules strictly:
+  const staffSummary = staff.map((s) => ({
+    id:              s.id,
+    name:            s.name,
+    role:            s.role,
+    unit:            s.unit,
+    certifications:  s.certifications,
+    shiftsLast14Days: s.shiftsLast14Days,
+    hoursLast30Days: s.hoursLast30Days,
+    burnoutRisk:     s.burnoutRisk || 'green',
+    wellnessScore:   s.wellnessScore,
+  }));
+
+  const prompt = `You are a healthcare schedule optimization agent for Riverside General Hospital.
+Your task is to edit the existing shift schedule so that every unit meets its minimum
+staffing requirements for each shift type over the next 72 hours.
+
+Minimum staffing requirements:
+  ICU-1 and ICU-2:
+    - Night shift: at least 2 nurses (RN/NP) AND at least 1 doctor (MD).
+    - Day  shift:  at least 3 nurses (RN/NP) AND at least 3 doctors (MD).
+  MedSurg-3:
+    - Night shift: at least 4 nurses (RN/NP) AND at least 2 doctors (MD).
+    - Day  shift:  at least 5 nurses (RN/NP) AND at least 4 doctors (MD).
+
+Additional labour rules:
   - Maximum 5 consecutive shifts per staff member.
   - Minimum 8 hours rest between shifts.
-  - Match required certifications per unit (ICU units require ACLS or CCRN; MedSurg-3 requires BLS minimum).
-  - Prefer staff with lower burnoutRisk for extra shifts; avoid scheduling red-risk staff for additional nights.
-  - Flag any scheduling gaps where requiredStaff cannot be met.
+  - ICU units require ACLS or CCRN certification; MedSurg-3 requires BLS minimum.
+  - Prefer staff with lower burnoutRisk for shift changes; avoid switching red-risk staff to night.
+  - Only change staff assigned to the same unit as the gap — do NOT move staff across units.
+  - Only reference entry IDs from the schedule below — do NOT invent new IDs.
 
-Demand forecasts (next 72 hours):
+Demand forecasts with current coverage status (status: ok | understaffed_nurses | understaffed_doctors | critical_shortage):
 ${JSON.stringify(forecasts, null, 2)}
+
+Current schedule entries for the next 72 hours (non-absent staff only):
+${JSON.stringify(entrySummary, null, 2)}
 
 Staff roster:
 ${JSON.stringify(staffSummary, null, 2)}
 
-Return ONLY a valid JSON object with exactly two keys: "schedule" and "gaps". No extra commentary.
+Instructions:
+1. For each forecast where status is NOT "ok", identify which shift type (day or night) is
+   understaffed for that unit on that date.
+2. Resolve the gap by changing the shiftType of existing schedule entries for that unit.
+   Prefer changing evening-shift staff to the needed shift type before changing day-shift staff.
+3. If a gap cannot be resolved (not enough staff in unit), record it in "gaps".
+4. Return ONLY a valid JSON object with exactly two keys: "scheduleUpdates" and "gaps".
 
 Format:
 {
-  "schedule": [
+  "scheduleUpdates": [
     {
-      "staffId": "<uuid>",
-      "staffName": "<name>",
-      "unit": "ICU-1",
-      "date": "2025-01-15T00:00:00.000Z",
-      "type": "day",
-      "hoursWorked": 12,
-      "patientLoad": 3
+      "id": "<existing scheduleEntry id>",
+      "shiftType": "night",
+      "shiftStart": "19:00",
+      "shiftEnd": "07:00",
+      "reason": "one-sentence justification"
     }
   ],
   "gaps": [
     {
       "unit": "ICU-2",
-      "date": "2025-01-16T00:00:00.000Z",
-      "type": "night",
-      "shortfall": 2,
-      "reason": "Insufficient ACLS-certified staff available"
+      "date": "2025-01-16",
+      "shiftType": "night",
+      "role": "MD",
+      "shortfall": 1,
+      "reason": "No additional MD available in unit for this shift"
     }
   ]
 }`;
 
   let rawResponse;
   try {
-    rawResponse = await generateText(prompt, { maxTokens: 2000, temperature: 0.2 });
+    rawResponse = await generateText(prompt, { maxTokens: 2400, temperature: 0.2 });
   } catch (err) {
     throw new Error(`[ScheduleOptimizer] Watsonx API call failed: ${err.message}`);
   }
@@ -90,30 +144,28 @@ Format:
     );
   }
 
-  const schedule = (parsed.schedule || []).map((item) =>
-    createShift({
-      staffId: item.staffId || '',
-      unit: item.unit || '',
-      date: item.date || new Date().toISOString(),
-      type: item.type || 'day',
-      hoursWorked: Number(item.hoursWorked) || 12,
-      patientLoad: Number(item.patientLoad) || 0,
-    })
-  );
+  const scheduleUpdates = (parsed.scheduleUpdates || []).map((u) => ({
+    id:         u.id || '',
+    shiftType:  u.shiftType || 'day',
+    shiftStart: u.shiftStart || SHIFT_TIMES[u.shiftType]?.shiftStart || '07:00',
+    shiftEnd:   u.shiftEnd   || SHIFT_TIMES[u.shiftType]?.shiftEnd   || '19:00',
+    reason:     u.reason || '',
+  }));
 
   const gaps = (parsed.gaps || []).map((g) => ({
-    unit: g.unit || '',
-    date: g.date || '',
-    type: g.type || '',
+    unit:      g.unit || '',
+    date:      g.date || '',
+    shiftType: g.shiftType || g.type || '',
+    role:      g.role || '',
     shortfall: Number(g.shortfall) || 1,
-    reason: g.reason || '',
+    reason:    g.reason || '',
   }));
 
   console.log(
-    `[ScheduleOptimizer] Generated ${schedule.length} shift assignments, ${gaps.length} gap(s) identified.`
+    `[ScheduleOptimizer] ${scheduleUpdates.length} schedule update(s) proposed, ${gaps.length} unresolvable gap(s).`
   );
 
-  return { schedule, gaps };
+  return { scheduleUpdates, gaps };
 }
 
 // ---------------------------------------------------------------------------
