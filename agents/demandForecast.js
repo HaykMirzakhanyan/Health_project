@@ -56,12 +56,12 @@ Instructions:
 - Do NOT include scheduledStaff or gapFlag — those are computed separately.
 
 Minimum staffing requirements — check the schedule and mark status accordingly:
-  ICU units (ICU-1 and ICU-2):
-    - Night shift: at least 2 nurses AND at least 1 doctor must be scheduled.
-    - Day shift:   at least 3 nurses AND at least 3 doctors must be scheduled.
+  ICU-1 and ICU-2:
+    - Night shift: at least 3 nurses (RN/NP) AND at least 2 doctor (MD).
+    - Day  shift:  at least 6 nurses (RN/NP) AND at least 5 doctors (MD).
   MedSurg-3:
-    - Night shift: at least 4 nurses AND at least 2 doctors must be scheduled.
-    - Day shift:   at least 5 nurses AND at least 4 doctors must be scheduled.
+    - Night shift: at least 4 nurses (RN/NP) AND at least 2 doctors (MD).
+    - Day  shift:  at least 5 nurses (RN/NP) AND at least 4 doctors (MD).
   Additional ratio rules:
     - Do NOT mark status as okay if there is fewer than 1 nurse per 2 patients in ICU.
     - Do NOT mark status as okay if there is fewer than 1 nurse per 5 patients in MedSurg-3.

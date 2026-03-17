@@ -74,8 +74,8 @@ staffing requirements for each shift type over the next 72 hours.
 
 Minimum staffing requirements:
   ICU-1 and ICU-2:
-    - Night shift: at least 2 nurses (RN/NP) AND at least 1 doctor (MD).
-    - Day  shift:  at least 3 nurses (RN/NP) AND at least 3 doctors (MD).
+    - Night shift: at least 3 nurses (RN/NP) AND at least 2 doctor (MD).
+    - Day  shift:  at least 6 nurses (RN/NP) AND at least 5 doctors (MD).
   MedSurg-3:
     - Night shift: at least 4 nurses (RN/NP) AND at least 2 doctors (MD).
     - Day  shift:  at least 5 nurses (RN/NP) AND at least 4 doctors (MD).
