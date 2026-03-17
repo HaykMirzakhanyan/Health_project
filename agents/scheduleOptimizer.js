@@ -116,4 +116,111 @@ Format:
   return { schedule, gaps };
 }
 
-module.exports = { runScheduleOptimizer };
+// ---------------------------------------------------------------------------
+// runFutureOptimizer
+//
+// @param {string} date            — YYYY-MM-DD target date
+// @param {Array}  currentEntries  — Current draft ScheduleEntry[] for that date
+// @param {Array}  pendingPatients — PendingPatient[] needing scheduling
+// @param {Array}  staff           — Full staff roster
+// @returns {Promise<Object>}      — { scheduleUpdates, patientAssignments, summary, suggestions }
+// ---------------------------------------------------------------------------
+async function runFutureOptimizer(date, currentEntries, pendingPatients, staff) {
+  const staffSummary = staff.map((s) => ({
+    id:              s.id,
+    name:            s.name,
+    role:            s.role,
+    unit:            s.unit,
+    certifications:  s.certifications,
+    burnoutRisk:     s.burnoutRisk || 'green',
+    wellnessScore:   s.wellnessScore,
+    shiftsLast14Days: s.shiftsLast14Days,
+  }));
+
+  const entrySummary = currentEntries.map((e) => ({
+    id:        e.id,
+    staffId:   e.staffId,
+    staffName: e.staffName,
+    role:      e.role,
+    unit:      e.unit,
+    shiftType: e.shiftType,
+    status:    e.status,
+  }));
+
+  const patientSummary = pendingPatients.map((p) => ({
+    id:          p.id,
+    name:        p.name,
+    unit:        p.unit,
+    reason:      p.reason,
+    priority:    p.priority,
+    dateNeededBy: p.dateNeededBy,
+  }));
+
+  const prompt = `You are a healthcare schedule optimization agent for Riverside General Hospital.
+Optimize the draft schedule for ${date} and assign pending patients to available staff.
+
+DRAFT SCHEDULE for ${date}:
+${JSON.stringify(entrySummary, null, 2)}
+
+PENDING PATIENTS needing scheduling on or before their dateNeededBy:
+${JSON.stringify(patientSummary, null, 2)}
+
+STAFF ROSTER:
+${JSON.stringify(staffSummary, null, 2)}
+
+RULES:
+- Prioritize urgent and high-priority patients first.
+- Match patients to staff in the same unit.
+- Avoid assigning extra patients to red-risk or high-burnout staff.
+- Suggest shift type changes (day/evening/night) only if it improves coverage.
+- ICU staff ratio: 1:2 (one nurse per 2 patients). MedSurg ratio: 1:5.
+- Only reference staff and patients from the data above — no invented names.
+
+Return ONLY a valid JSON object with these keys:
+{
+  "scheduleUpdates": [
+    { "id": "<scheduleEntryId>", "shiftType": "day|evening|night" }
+  ],
+  "patientAssignments": [
+    {
+      "patientId":    "<pendingPatientId>",
+      "patientName":  "<name>",
+      "staffId":      "<staffId>",
+      "staffName":    "<name>",
+      "suggestedTime": "HH:MM",
+      "reason":       "one sentence justification"
+    }
+  ],
+  "summary": "2-3 sentence plain-language summary of changes made",
+  "suggestions": ["array of plain-language tips for the charge nurse"]
+}`;
+
+  let rawResponse;
+  try {
+    rawResponse = await generateText(prompt, { maxTokens: 2000, temperature: 0.2 });
+  } catch (err) {
+    throw new Error(`[FutureOptimizer] Watsonx API call failed: ${err.message}`);
+  }
+
+  let parsed;
+  try {
+    parsed = parseJSON(rawResponse);
+  } catch (err) {
+    throw new Error(`[FutureOptimizer] Failed to parse JSON: ${err.message}\nRaw: ${rawResponse}`);
+  }
+
+  console.log(
+    `[FutureOptimizer] ${date} — ` +
+    `${(parsed.scheduleUpdates || []).length} schedule updates, ` +
+    `${(parsed.patientAssignments || []).length} patient assignments.`
+  );
+
+  return {
+    scheduleUpdates:    parsed.scheduleUpdates    || [],
+    patientAssignments: parsed.patientAssignments || [],
+    summary:            parsed.summary            || '',
+    suggestions:        parsed.suggestions        || [],
+  };
+}
+
+module.exports = { runScheduleOptimizer, runFutureOptimizer };

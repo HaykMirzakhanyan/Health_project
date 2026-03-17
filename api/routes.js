@@ -434,6 +434,25 @@ router.get('/timeline', (req, res) => {
       );
     }
 
+    // Future date — use store.futureSchedule
+    const reqDate  = new Date(dateStr);
+    const todayDate = new Date(today);
+    if (reqDate > todayDate) {
+      const entries = store.futureSchedule
+        .filter((e) => e.date === dateStr)
+        .map((e) => ({
+          staffId:    e.staffId,
+          staffName:  e.staffName,
+          role:       e.role,
+          unit:       e.unit,
+          shiftStart: e.shiftStart,
+          shiftEnd:   e.shiftEnd,
+          shiftType:  e.shiftType,
+          status:     e.status,
+        }));
+      return res.json(entries);
+    }
+
     // Historical date — use store.shifts
     const staffMap = {};
     store.staff.forEach((s) => { staffMap[s.id] = s; });
@@ -457,6 +476,206 @@ router.get('/timeline', (req, res) => {
 
     res.json(entries);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ===========================================================================
+// Future Schedule (next 14 days)
+// ===========================================================================
+
+/**
+ * GET /api/future-schedule?date=YYYY-MM-DD
+ * Returns all future schedule entries for the given date.
+ */
+router.get('/future-schedule', (req, res) => {
+  try {
+    const { date } = req.query;
+    const entries = date
+      ? store.futureSchedule.filter((e) => e.date === date)
+      : store.futureSchedule;
+    res.json(entries);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/future-schedule
+ * Body: { staffId, date, shiftType }
+ * Adds a new schedule entry for a future date.
+ */
+router.post('/future-schedule', (req, res) => {
+  try {
+    const { createScheduleEntry } = require('../data/schema');
+    const SHIFT_TIMES = {
+      day:     { start: '07:00', end: '19:00' },
+      evening: { start: '15:00', end: '03:00' },
+      night:   { start: '19:00', end: '07:00' },
+    };
+
+    const { staffId, date, shiftType = 'day' } = req.body;
+    if (!staffId || !date) {
+      return res.status(400).json({ error: 'staffId and date are required.' });
+    }
+
+    const member = store.staff.find((s) => s.id === staffId);
+    if (!member) return res.status(404).json({ error: 'Staff member not found.' });
+
+    const times = SHIFT_TIMES[shiftType] || SHIFT_TIMES.day;
+    const entry = createScheduleEntry({
+      staffId,
+      staffName:  member.name,
+      role:       member.role,
+      unit:       member.unit,
+      date,
+      shiftType,
+      shiftStart: times.start,
+      shiftEnd:   times.end,
+      status:     'scheduled',
+    });
+
+    store.futureSchedule.push(entry);
+    res.status(201).json(entry);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * PATCH /api/future-schedule/:id
+ * Body: { shiftType?, status? }
+ * Updates an existing future schedule entry.
+ */
+router.patch('/future-schedule/:id', (req, res) => {
+  try {
+    const SHIFT_TIMES = {
+      day:     { start: '07:00', end: '19:00' },
+      evening: { start: '15:00', end: '03:00' },
+      night:   { start: '19:00', end: '07:00' },
+    };
+
+    const entry = store.futureSchedule.find((e) => e.id === req.params.id);
+    if (!entry) return res.status(404).json({ error: 'Schedule entry not found.' });
+
+    const { shiftType, status } = req.body;
+    if (shiftType && ['day', 'evening', 'night'].includes(shiftType)) {
+      const times = SHIFT_TIMES[shiftType];
+      entry.shiftType  = shiftType;
+      entry.shiftStart = times.start;
+      entry.shiftEnd   = times.end;
+    }
+    if (status && ['scheduled', 'absent'].includes(status)) {
+      entry.status = status;
+    }
+
+    res.json(entry);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/future-schedule/:id
+ * Removes a future schedule entry.
+ */
+router.delete('/future-schedule/:id', (req, res) => {
+  try {
+    const idx = store.futureSchedule.findIndex((e) => e.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Schedule entry not found.' });
+    store.futureSchedule.splice(idx, 1);
+    res.json({ message: 'Entry removed.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ===========================================================================
+// Pending Patients
+// ===========================================================================
+
+/**
+ * GET /api/pending-patients
+ * Returns all pending patients. Optional ?unit=ICU-1 and ?scheduled=false
+ */
+router.get('/pending-patients', (req, res) => {
+  try {
+    let patients = store.pendingPatients;
+    if (req.query.unit) patients = patients.filter((p) => p.unit === req.query.unit);
+    if (req.query.scheduled !== undefined) {
+      const want = req.query.scheduled === 'true';
+      patients = patients.filter((p) => p.scheduled === want);
+    }
+    res.json(patients);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * PATCH /api/pending-patients/:id
+ * Body: { assignedStaffId?, scheduledDate?, scheduledTime?, scheduled? }
+ */
+router.patch('/pending-patients/:id', (req, res) => {
+  try {
+    const patient = store.pendingPatients.find((p) => p.id === req.params.id);
+    if (!patient) return res.status(404).json({ error: 'Pending patient not found.' });
+
+    const { assignedStaffId, scheduledDate, scheduledTime, scheduled } = req.body;
+    if (assignedStaffId !== undefined) patient.assignedStaffId = assignedStaffId;
+    if (scheduledDate   !== undefined) patient.scheduledDate   = scheduledDate;
+    if (scheduledTime   !== undefined) patient.scheduledTime   = scheduledTime;
+    if (scheduled       !== undefined) patient.scheduled       = scheduled;
+
+    res.json(patient);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ===========================================================================
+// AI-assisted future schedule optimisation
+// ===========================================================================
+
+/**
+ * POST /api/optimize-future?date=YYYY-MM-DD
+ * Runs the schedule optimiser against the draft future schedule and pending
+ * patients for the given date, returning AI suggestions.
+ */
+router.post('/optimize-future', async (req, res) => {
+  try {
+    const { runFutureOptimizer } = require('../agents/scheduleOptimizer');
+    const date = req.query.date || req.body.date;
+    if (!date) return res.status(400).json({ error: 'date query param required.' });
+
+    const entries  = store.futureSchedule.filter((e) => e.date === date);
+    const pending  = store.pendingPatients.filter((p) => !p.scheduled && p.dateNeededBy >= date);
+
+    const result = await runFutureOptimizer(date, entries, pending, store.staff);
+
+    // Apply any schedule suggestions back to the store
+    if (Array.isArray(result.scheduleUpdates)) {
+      result.scheduleUpdates.forEach((upd) => {
+        const entry = store.futureSchedule.find((e) => e.id === upd.id);
+        if (entry && upd.shiftType) {
+          const SHIFT_TIMES = {
+            day: { start: '07:00', end: '19:00' },
+            evening: { start: '15:00', end: '03:00' },
+            night: { start: '19:00', end: '07:00' },
+          };
+          const times = SHIFT_TIMES[upd.shiftType];
+          if (times) {
+            entry.shiftType  = upd.shiftType;
+            entry.shiftStart = times.start;
+            entry.shiftEnd   = times.end;
+          }
+        }
+      });
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error('[POST /optimize-future]', err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -16,6 +16,7 @@ const {
   createScheduleEntry,
   createPatient,
   createAppointment,
+  createPendingPatient,
   createUser,
   store,
 } = require('./schema');
@@ -477,6 +478,104 @@ seedPatients.forEach((patient) => {
 seedAppointments.sort((a, b) => a.time.localeCompare(b.time));
 
 // ---------------------------------------------------------------------------
+// Future schedule — days +1 through +14, one entry per staff member per day
+// ---------------------------------------------------------------------------
+const seedFutureSchedule = [];
+
+for (let dayOffset = 1; dayOffset <= 14; dayOffset++) {
+  const dateStr = relativeDate(dayOffset).split('T')[0];
+
+  seedStaff.forEach((member) => {
+    const shiftType = pickShiftType(member.nightShiftRatio);
+    const times     = SHIFT_TIMES[shiftType];
+    const status    = Math.random() < 0.1 ? 'absent' : 'scheduled';
+    const patientLoad = member.unit === 'MedSurg-3'
+      ? Math.floor(Math.random() * 4) + 4
+      : Math.floor(Math.random() * 2) + 2;
+
+    seedFutureSchedule.push(
+      createScheduleEntry({
+        staffId:          member.id,
+        staffName:        member.name,
+        role:             member.role,
+        unit:             member.unit,
+        date:             dateStr,
+        shiftType,
+        shiftStart:       times.start,
+        shiftEnd:         times.end,
+        hoursWorkedToday: 0,
+        patientLoad:      status === 'absent' ? 0 : patientLoad,
+        status,
+      })
+    );
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Pending patients — 20 patients needing appointments in the next two weeks
+// ---------------------------------------------------------------------------
+const PENDING_REASONS = {
+  'ICU-1': [
+    'Post-cardiac catheterisation monitoring',
+    'STEMI follow-up — step-down from CCU',
+    'Hypertensive crisis management',
+    'Acute decompensated heart failure',
+    'Post-ablation cardiac monitoring',
+  ],
+  'ICU-2': [
+    'Post-thoracic surgery recovery',
+    'COPD exacerbation with respiratory failure',
+    'Pneumonia — high-flow oxygen requirement',
+    'Pulmonary embolism — anticoagulation initiation',
+    'Post-CABG day-2 transfer from surgical ICU',
+  ],
+  'MedSurg-3': [
+    'Hip replacement post-operative care',
+    'Appendectomy recovery — routine obs',
+    'Cellulitis — IV antibiotics course',
+    'Bowel obstruction — conservative management',
+    'Diabetic foot wound care',
+    'COPD stable — oral-steroid taper monitoring',
+    'Knee replacement rehabilitation',
+    'Post-colonoscopy observation',
+    'Chest pain rule-out — telemetry monitoring',
+    'Urinary tract infection — IV antibiotics',
+  ],
+};
+
+const PENDING_NAMES = [
+  'Arthur Pemberton',  'Sylvia Nakashima', 'Robert Okafor',    'Diana Chen',
+  'Harold Stein',      'Valentina Cruz',   'Eugene Marsh',      'Constance Webb',
+  'Franklin Diaz',     'Miriam Holloway',  'Jerome Patten',     'Ingrid Sorenson',
+  'Chester Yamamoto',  'Rosalie Fontaine', 'Augustus Cole',     'Harriet Nguyen',
+  'Leopold Grant',     'Millicent Ashby',  'Percival Wu',       'Agatha Ferreira',
+];
+
+const PENDING_PRIORITIES = ['low', 'medium', 'medium', 'high', 'urgent'];
+
+const seedPendingPatients = PENDING_NAMES.map((name, i) => {
+  const unit      = UNITS[i % 3];
+  const reasons   = PENDING_REASONS[unit];
+  const reason    = reasons[i % reasons.length];
+  const priority  = PENDING_PRIORITIES[i % PENDING_PRIORITIES.length];
+  const maxDays   = priority === 'urgent' ? 3 : priority === 'high' ? 6 : 14;
+  const daysOut   = Math.max(1, Math.floor(Math.random() * maxDays) + 1);
+
+  const dob = new Date();
+  dob.setFullYear(dob.getFullYear() - (40 + (i * 2) % 40));
+
+  return createPendingPatient({
+    name,
+    dob:          dob.toISOString().split('T')[0],
+    unit,
+    reason,
+    priority,
+    notes:        priority === 'urgent' ? 'Flagged by ED physician — expedite scheduling.' : '',
+    dateNeededBy: relativeDate(daysOut).split('T')[0],
+  });
+});
+
+// ---------------------------------------------------------------------------
 // User logins — one account per staff member + charge nurse + admin accounts
 // NOTE: Plain text passwords for demo only. Use bcrypt in production.
 // ---------------------------------------------------------------------------
@@ -530,21 +629,22 @@ seedUsers.push(
 // loadSeed() — populates the shared in-memory store on startup
 // ---------------------------------------------------------------------------
 function loadSeed() {
-  store.staff = [...seedStaff];
-  store.shifts = [...seedShifts];
-  store.todaySchedule = [...seedTodaySchedule];
-  store.patients = [...seedPatients];
-  store.appointments = [...seedAppointments];
-  store.users = [...seedUsers];
-
-  // Procedures live on the store as a convenience for the orchestrator
-  // In production: these would come from the EHR scheduling system
-  store.procedures = [...seedProcedures];
+  store.staff           = [...seedStaff];
+  store.shifts          = [...seedShifts];
+  store.todaySchedule   = [...seedTodaySchedule];
+  store.futureSchedule  = [...seedFutureSchedule];
+  store.pendingPatients = [...seedPendingPatients];
+  store.patients        = [...seedPatients];
+  store.appointments    = [...seedAppointments];
+  store.users           = [...seedUsers];
+  store.procedures      = [...seedProcedures];
 
   console.log(
     `[Seed] Loaded ${store.staff.length} staff, ` +
       `${store.shifts.length} historical shifts, ` +
       `${store.todaySchedule.length} today's schedule entries, ` +
+      `${store.futureSchedule.length} future schedule entries (14 days), ` +
+      `${store.pendingPatients.length} pending patients, ` +
       `${store.patients.length} patients, ` +
       `${store.appointments.length} appointments, ` +
       `${store.users.length} user accounts, ` +
@@ -576,6 +676,8 @@ module.exports = {
   seedStaff,
   seedShifts,
   seedTodaySchedule,
+  seedFutureSchedule,
+  seedPendingPatients,
   seedPatients,
   seedAppointments,
   seedUsers,

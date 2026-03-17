@@ -156,6 +156,30 @@ function createAppointment(overrides = {}) {
 }
 
 /**
+ * Creates a PendingPatient record — a patient who needs scheduling
+ * within the next two weeks.
+ * @param {Object} overrides
+ * @returns {Object}
+ */
+function createPendingPatient(overrides = {}) {
+  return {
+    id:              require('uuid').v4(),
+    name:            '',
+    dob:             '',
+    unit:            '',           // required unit: ICU-1 | ICU-2 | MedSurg-3
+    reason:          '',           // reason for visit / admission
+    priority:        'medium',     // low | medium | high | urgent
+    notes:           '',
+    dateNeededBy:    '',           // YYYY-MM-DD — latest acceptable date
+    scheduled:       false,
+    assignedStaffId: null,
+    scheduledDate:   null,
+    scheduledTime:   null,
+    ...overrides,
+  };
+}
+
+/**
  * Creates a User login record.
  * NOTE: Passwords are stored in plain text here for demo purposes only.
  * In production use bcrypt/argon2 and never store plain text passwords.
@@ -189,6 +213,8 @@ const store = {
   burnoutScores: [],
   interventions: [],
   todaySchedule: [],
+  futureSchedule: [],
+  pendingPatients: [],
   patients: [],
   appointments: [],
   users: [],
@@ -203,6 +229,7 @@ module.exports = {
   createScheduleEntry,
   createPatient,
   createAppointment,
+  createPendingPatient,
   createUser,
   store,
 };

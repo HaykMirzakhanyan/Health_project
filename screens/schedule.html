@@ -495,6 +495,241 @@
     height: 12px;
     border-radius: 2px;
   }
+
+  /* EDIT PANEL */
+  .edit-panel {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 52vh;
+    background: #fff;
+    border-top: 3px solid #1f3b57;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.18);
+    display: flex;
+    flex-direction: column;
+    z-index: 20;
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+  }
+  .edit-panel.open { transform: translateY(0); }
+
+  .edit-panel-header {
+    background: #1f3b57;
+    color: #fff;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .edit-panel-header h3 { margin: 0; font-size: 15px; }
+
+  .edit-panel-header .ep-date {
+    font-size: 13px;
+    opacity: 0.75;
+    margin-left: 4px;
+  }
+
+  .ep-optimize-btn {
+    padding: 5px 14px;
+    background: #f39c12;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .ep-optimize-btn:hover    { background: #d68910; }
+  .ep-optimize-btn:disabled { background: #aaa; cursor: not-allowed; }
+
+  .ep-save-btn {
+    padding: 5px 14px;
+    background: #27ae60;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .ep-save-btn:hover { background: #1e8449; }
+
+  .ep-close-btn {
+    margin-left: auto;
+    padding: 4px 10px;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.4);
+    color: #fff;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+
+  .edit-panel-body {
+    display: grid;
+    grid-template-columns: 55% 45%;
+    flex: 1;
+    overflow: hidden;
+    gap: 0;
+  }
+
+  .ep-staff-panel, .ep-patients-panel {
+    overflow-y: auto;
+    padding: 10px 14px;
+  }
+
+  .ep-staff-panel { border-right: 1px solid #dde8f5; }
+
+  .ep-section-title {
+    font-size: 13px;
+    font-weight: bold;
+    color: #1f3b57;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .ep-add-btn {
+    padding: 3px 10px;
+    background: #1f3b57;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .ep-staff-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: 6px;
+    margin-bottom: 4px;
+    background: #f5faff;
+    font-size: 13px;
+  }
+
+  .ep-staff-row:hover { background: #e9f3ff; }
+
+  .ep-staff-name { flex: 1; font-weight: bold; color: #1f3b57; }
+  .ep-staff-meta { font-size: 11px; color: #888; }
+
+  .ep-shift-select {
+    padding: 3px 6px;
+    border: 1px solid #b5c7d8;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #1f3b57;
+    cursor: pointer;
+  }
+
+  .ep-remove-btn {
+    padding: 2px 8px;
+    background: #e74c3c;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+
+  .ep-patient-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    margin-bottom: 5px;
+    background: #f5faff;
+    font-size: 12px;
+  }
+
+  .ep-patient-row.scheduled-row { opacity: 0.5; }
+
+  .ep-priority-badge {
+    padding: 2px 6px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: bold;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .ep-priority-badge.urgent { background: #f8d7da; color: #721c24; }
+  .ep-priority-badge.high   { background: #ffe5cc; color: #7a3500; }
+  .ep-priority-badge.medium { background: #fff3cd; color: #856404; }
+  .ep-priority-badge.low    { background: #d4edda; color: #155724; }
+
+  .ep-patient-info { flex: 1; }
+  .ep-patient-name { font-weight: bold; color: #1f3b57; }
+  .ep-patient-reason { color: #555; font-size: 11px; margin-top: 2px; }
+  .ep-patient-due { color: #888; font-size: 10px; margin-top: 1px; }
+
+  .ep-assign-btn {
+    padding: 3px 9px;
+    background: #2980b9;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .ep-assign-btn:disabled { background: #27ae60; cursor: default; }
+
+  .ep-ai-result {
+    background: #e9f3ff;
+    border-left: 4px solid #f39c12;
+    border-radius: 0 6px 6px 0;
+    padding: 8px 12px;
+    margin: 6px 0;
+    font-size: 12px;
+    color: #333;
+    line-height: 1.5;
+  }
+
+  .ep-add-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 30;
+  }
+
+  .ep-add-modal-box {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px 24px;
+    min-width: 300px;
+    max-width: 380px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+  }
+
+  .ep-add-modal-box h3 { margin: 0 0 12px; font-size: 16px; color: #1f3b57; }
+
+  .ep-add-modal-box select, .ep-add-modal-box input {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid #b5c7d8;
+    border-radius: 6px;
+    font-size: 14px;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+  }
+
+  .ep-modal-buttons { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+  .ep-modal-buttons button {
+    padding: 7px 16px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .ep-modal-confirm { background: #1f3b57; color: #fff; }
+  .ep-modal-cancel  { background: #e2e8ee; color: #333; }
 </style>
 </head>
 
@@ -531,6 +766,7 @@
           <button onclick="changeDate(-1)">&#9664;</button>
           <span id="dateDisplay">Today</span>
           <button onclick="changeDate(1)">&#9654;</button>
+          <button id="editScheduleBtn" onclick="openEditPanel()" style="display:none;padding:3px 12px;background:#1f3b57;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;margin-left:6px;">Edit Schedule</button>
         </div>
       </div>
     </div>
@@ -918,9 +1154,10 @@
   function changeDate(delta) {
     const d = new Date(timelineDate);
     d.setDate(d.getDate() + delta);
-    // Don't go beyond today or more than 31 days back
+    // Don't go more than 31 days back or more than 14 days forward
     const today = new Date(); today.setHours(0,0,0,0);
-    if (d > today) return;
+    const maxDate = new Date(today); maxDate.setDate(maxDate.getDate() + 14);
+    if (d > maxDate) return;
     timelineDate = d;
     renderTimeline();
   }
@@ -967,6 +1204,12 @@
     document.getElementById('dateDisplay').textContent = formatDateDisplay(timelineDate);
     document.getElementById('scheduleTitle').textContent =
       isToday ? "Today's Schedule" : formatDateDisplay(timelineDate) + ' Schedule';
+
+    // Show edit button only for future dates (up to +14 days)
+    const today0  = new Date(); today0.setHours(0,0,0,0);
+    const maxDate = new Date(today0); maxDate.setDate(maxDate.getDate() + 14);
+    const editBtn = document.getElementById('editScheduleBtn');
+    editBtn.style.display = (timelineDate > today0 && timelineDate <= maxDate) ? 'inline-block' : 'none';
 
     content.innerHTML = '<p class="no-data" style="padding:20px;">Loading…</p>';
 
@@ -1061,6 +1304,266 @@
     }
   }
 
+  // ── EDIT PANEL ──────────────────────────────────────────
+
+  let editPanelDate   = null;   // YYYY-MM-DD currently being edited
+  let editEntries     = [];     // local draft copy of schedule entries
+  let pendingPatients = [];     // pending patients for the edit panel
+
+  async function openEditPanel() {
+    const dateStr = timelineDate.toISOString().split('T')[0];
+    editPanelDate = dateStr;
+    document.getElementById('epDateLabel').textContent = formatDateDisplay(timelineDate);
+    document.getElementById('epAiResult').style.display = 'none';
+
+    // Load draft entries and pending patients in parallel
+    const [entriesRes, patientsRes] = await Promise.all([
+      fetch(`/api/future-schedule?date=${dateStr}`),
+      fetch(`/api/pending-patients?scheduled=false`),
+    ]);
+    editEntries     = entriesRes.ok  ? await entriesRes.json()  : [];
+    pendingPatients = patientsRes.ok ? await patientsRes.json() : [];
+
+    renderEditStaff();
+    renderEditPatients();
+    document.getElementById('editPanel').classList.add('open');
+  }
+
+  function closeEditPanel() {
+    document.getElementById('editPanel').classList.remove('open');
+    editPanelDate = null;
+  }
+
+  function renderEditStaff() {
+    const list = document.getElementById('epStaffList');
+    const filtered = currentUnit === 'all'
+      ? editEntries
+      : editEntries.filter(e => e.unit === currentUnit);
+
+    if (!filtered.length) {
+      list.innerHTML = '<p style="font-size:13px;color:#888;">No staff scheduled. Use "+ Add Staff" to add.</p>';
+      return;
+    }
+
+    list.innerHTML = filtered.map(e => `
+      <div class="ep-staff-row" id="eprow-${e.id}">
+        <div>
+          <div class="ep-staff-name">${e.staffName}</div>
+          <div class="ep-staff-meta">${e.role} · ${e.unit}</div>
+        </div>
+        <select class="ep-shift-select" onchange="updateShiftType('${e.id}', this.value)">
+          <option value="day"     ${e.shiftType==='day'     ? 'selected' : ''}>Day</option>
+          <option value="evening" ${e.shiftType==='evening' ? 'selected' : ''}>Evening</option>
+          <option value="night"   ${e.shiftType==='night'   ? 'selected' : ''}>Night</option>
+        </select>
+        <select class="ep-shift-select" onchange="updateStatus('${e.id}', this.value)">
+          <option value="scheduled" ${e.status==='scheduled' ? 'selected' : ''}>Scheduled</option>
+          <option value="absent"    ${e.status==='absent'    ? 'selected' : ''}>Absent</option>
+        </select>
+        <button class="ep-remove-btn" onclick="removeEntry('${e.id}')">Remove</button>
+      </div>`).join('');
+  }
+
+  function renderEditPatients() {
+    const list = document.getElementById('epPatientList');
+    const filtered = currentUnit === 'all'
+      ? pendingPatients
+      : pendingPatients.filter(p => p.unit === currentUnit);
+
+    if (!filtered.length) {
+      list.innerHTML = '<p style="font-size:13px;color:#888;">No pending patients for this unit.</p>';
+      return;
+    }
+
+    list.innerHTML = filtered.map(p => `
+      <div class="ep-patient-row ${p.scheduled ? 'scheduled-row' : ''}" id="eppat-${p.id}">
+        <span class="ep-priority-badge ${p.priority}">${p.priority.toUpperCase()}</span>
+        <div class="ep-patient-info">
+          <div class="ep-patient-name">${p.name}</div>
+          <div class="ep-patient-reason">${p.reason}</div>
+          <div class="ep-patient-due">Needed by: ${p.dateNeededBy} · ${p.unit}</div>
+        </div>
+        <button class="ep-assign-btn" id="epasn-${p.id}"
+          ${p.scheduled ? 'disabled' : ''}
+          onclick="assignPatient('${p.id}')">
+          ${p.scheduled ? 'Assigned' : 'Assign'}
+        </button>
+      </div>`).join('');
+  }
+
+  function updateShiftType(entryId, shiftType) {
+    const entry = editEntries.find(e => e.id === entryId);
+    if (entry) entry.shiftType = shiftType;
+  }
+
+  function updateStatus(entryId, status) {
+    const entry = editEntries.find(e => e.id === entryId);
+    if (entry) entry.status = status;
+  }
+
+  function removeEntry(entryId) {
+    editEntries = editEntries.filter(e => e.id !== entryId);
+    const row = document.getElementById(`eprow-${entryId}`);
+    if (row) row.remove();
+  }
+
+  async function assignPatient(patientId) {
+    const patient = pendingPatients.find(p => p.id === patientId);
+    if (!patient) return;
+
+    // Find available staff in the same unit for the edit date
+    const unitStaff = editEntries.filter(e => e.unit === patient.unit && e.status === 'scheduled');
+    if (!unitStaff.length) {
+      alert(`No scheduled staff found in ${patient.unit} for this date.`);
+      return;
+    }
+
+    // Simple UI: pick first available or show a small prompt
+    const names   = unitStaff.map(e => e.staffName);
+    const chosen  = names.length === 1
+      ? unitStaff[0]
+      : unitStaff.find(e => e.staffName === window.prompt(
+          `Assign ${patient.name} to which staff member?\n${names.join('\n')}`,
+          names[0]
+        ));
+
+    if (!chosen) return;
+
+    try {
+      await fetch(`/api/pending-patients/${patientId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assignedStaffId: chosen.staffId,
+          scheduledDate:   editPanelDate,
+          scheduledTime:   chosen.shiftStart,
+          scheduled:       true,
+        }),
+      });
+      patient.scheduled = true;
+      const btn = document.getElementById(`epasn-${patientId}`);
+      if (btn) { btn.textContent = 'Assigned'; btn.disabled = true; }
+      const row = document.getElementById(`eppat-${patientId}`);
+      if (row) row.classList.add('scheduled-row');
+    } catch (err) {
+      console.error('Assign failed:', err);
+    }
+  }
+
+  async function saveEditPanel() {
+    if (!editPanelDate) return;
+    try {
+      await Promise.all(editEntries.map(e =>
+        fetch(`/api/future-schedule/${e.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ shiftType: e.shiftType, status: e.status }),
+        })
+      ));
+      closeEditPanel();
+      if (currentView === 'timeline') renderTimeline();
+    } catch (err) {
+      console.error('Save failed:', err);
+    }
+  }
+
+  async function optimizeWithAI() {
+    if (!editPanelDate) return;
+    const btn = document.getElementById('epOptimizeBtn');
+    btn.disabled = true;
+    btn.textContent = 'Optimizing…';
+
+    const resultEl = document.getElementById('epAiResult');
+    resultEl.style.display = 'block';
+    resultEl.textContent = 'Running AI analysis…';
+
+    try {
+      const res  = await fetch(`/api/optimize-future?date=${editPanelDate}`, { method: 'POST' });
+      const data = res.ok ? await res.json() : null;
+
+      if (!data) throw new Error('Empty response');
+
+      // Reload entries after AI updates
+      const entriesRes = await fetch(`/api/future-schedule?date=${editPanelDate}`);
+      editEntries = entriesRes.ok ? await entriesRes.json() : editEntries;
+
+      // Apply patient assignments to local state
+      if (data.patientAssignments && data.patientAssignments.length) {
+        data.patientAssignments.forEach(a => {
+          const p = pendingPatients.find(x => x.id === a.patientId);
+          if (p) {
+            p.scheduled       = true;
+            p.assignedStaffId = a.staffId;
+            p.scheduledDate   = editPanelDate;
+            p.scheduledTime   = a.suggestedTime;
+          }
+        });
+      }
+
+      renderEditStaff();
+      renderEditPatients();
+
+      let resultHtml = '';
+      if (data.summary) resultHtml += `<strong>Summary:</strong> ${data.summary}<br>`;
+      if (data.suggestions && data.suggestions.length) {
+        resultHtml += `<strong>Tips:</strong> ${data.suggestions.map(s => `• ${s}`).join('<br>')}`;
+      }
+      if (data.patientAssignments && data.patientAssignments.length) {
+        resultHtml += `<br><strong>Patient assignments (${data.patientAssignments.length}):</strong> ` +
+          data.patientAssignments.map(a => `${a.patientName} → ${a.staffName} at ${a.suggestedTime}`).join(', ');
+      }
+      resultEl.innerHTML = resultHtml || 'Optimization complete — no changes suggested.';
+
+    } catch (err) {
+      resultEl.textContent = `AI optimization failed: ${err.message}`;
+      console.error(err);
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Optimize with AI';
+  }
+
+  // Add Staff Modal
+  function openAddStaffModal() {
+    const select = document.getElementById('addStaffSelect');
+    const unit   = currentUnit;
+    const available = allStaff.filter(s => unit === 'all' || s.unit === unit);
+    select.innerHTML = available.map(s =>
+      `<option value="${s.id}">${s.name} (${s.role} · ${s.unit})</option>`
+    ).join('');
+    document.getElementById('addStaffModal').style.display = 'flex';
+  }
+
+  function closeAddStaffModal() {
+    document.getElementById('addStaffModal').style.display = 'none';
+  }
+
+  async function confirmAddStaff() {
+    const staffId   = document.getElementById('addStaffSelect').value;
+    const shiftType = document.getElementById('addShiftSelect').value;
+    if (!staffId || !editPanelDate) return;
+
+    // Check not already on schedule
+    if (editEntries.find(e => e.staffId === staffId)) {
+      alert('This staff member is already on the schedule for this date.');
+      return;
+    }
+
+    try {
+      const res   = await fetch('/api/future-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ staffId, date: editPanelDate, shiftType }),
+      });
+      const entry = await res.json();
+      editEntries.push(entry);
+      renderEditStaff();
+      closeAddStaffModal();
+    } catch (err) {
+      console.error('Add staff failed:', err);
+    }
+  }
+
   // ── INITIAL LOAD ─────────────────────────────────────────
   async function init() {
     try {
@@ -1103,6 +1606,48 @@
 
   init();
 </script>
+
+<!-- EDIT PANEL -->
+<div class="edit-panel" id="editPanel">
+  <div class="edit-panel-header">
+    <h3>Edit Schedule</h3>
+    <span class="ep-date" id="epDateLabel"></span>
+    <button class="ep-optimize-btn" id="epOptimizeBtn" onclick="optimizeWithAI()">Optimize with AI</button>
+    <button class="ep-save-btn" onclick="saveEditPanel()">Save Changes</button>
+    <button class="ep-close-btn" onclick="closeEditPanel()">Close</button>
+  </div>
+  <div id="epAiResult" style="display:none;" class="ep-ai-result"></div>
+  <div class="edit-panel-body">
+    <div class="ep-staff-panel">
+      <div class="ep-section-title">
+        Staff on Shift
+        <button class="ep-add-btn" onclick="openAddStaffModal()">+ Add Staff</button>
+      </div>
+      <div id="epStaffList"></div>
+    </div>
+    <div class="ep-patients-panel">
+      <div class="ep-section-title">Pending Patients</div>
+      <div id="epPatientList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD STAFF MODAL -->
+<div class="ep-add-modal" id="addStaffModal" style="display:none;">
+  <div class="ep-add-modal-box">
+    <h3>Add Staff to Schedule</h3>
+    <select id="addStaffSelect"></select>
+    <select id="addShiftSelect">
+      <option value="day">Day (07:00 – 19:00)</option>
+      <option value="evening">Evening (15:00 – 03:00)</option>
+      <option value="night">Night (19:00 – 07:00)</option>
+    </select>
+    <div class="ep-modal-buttons">
+      <button class="ep-modal-cancel" onclick="closeAddStaffModal()">Cancel</button>
+      <button class="ep-modal-confirm" onclick="confirmAddStaff()">Add</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
