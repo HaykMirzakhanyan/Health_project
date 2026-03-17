@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>System Login</title>
+
+<style>
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f5faff;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .login-box {
+    background: white;
+    width: 360px;
+    padding: 35px 40px;
+    border-radius: 14px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  }
+
+  .login-title {
+    font-size: 24px;
+    font-weight: bold;
+    color: #1f3b57;
+    margin-bottom: 25px;
+    text-align: center;
+  }
+
+  .input-label {
+    font-size: 15px;
+    font-weight: bold;
+    margin-bottom: 6px;
+    display: block;
+    color: #1f3b57;
+  }
+
+  .input-field {
+    width: 100%;
+    padding: 12px 14px;        /* perfectly even spacing */
+    font-size: 15px;
+    border-radius: 8px;
+    border: 1px solid #b5c7d8;
+    margin-bottom: 20px;
+    outline: none;
+    transition: border 0.2s;
+    box-sizing: border-box;    /* ensures symmetry */
+  }
+
+  .input-field:focus {
+    border-color: #1f3b57;
+  }
+
+  .login-btn {
+    width: 100%;
+    padding: 12px;
+    background: #1f3b57;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .login-btn:hover {
+    background: #244766;
+  }
+
+  .error-message {
+    color: #e74c3c;
+    font-size: 14px;
+    margin-bottom: 12px;
+    display: none;
+  }
+</style>
+</head>
+
+<body>
+
+<div class="login-box">
+  <div class="login-title">System Login</div>
+
+  <div id="errorMessage" class="error-message">Please enter both fields.</div>
+
+  <label class="input-label">ID</label>
+  <input type="text" id="loginId" class="input-field" placeholder="Enter your ID">
+
+  <label class="input-label">Password</label>
+  <input type="password" id="password" class="input-field" placeholder="Enter your password">
+
+  <button class="login-btn" id="loginBtn">Login</button>
+</div>
+
+<script>
+  const loginBtn = document.getElementById('loginBtn');
+  const loginId = document.getElementById('loginId');
+  const password = document.getElementById('password');
+  const errorMessage = document.getElementById('errorMessage');
+
+  loginBtn.addEventListener('click', () => {
+    const id = loginId.value.trim();
+    const pass = password.value.trim();
+
+    if (!id || !pass) {
+      errorMessage.style.display = "block";
+      return;
+    }
+
+    errorMessage.style.display = "none";
+
+    // Placeholder login logic — replace with your agent later
+    console.log("ID:", id);
+    console.log("Password:", pass);
+
+    // Example redirect (change later)
+    // window.location.href = "hr.html";
+  });
+</script>
+
+</body>
+</html>

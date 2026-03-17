@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HR Dashboard</title>
+
+<style>
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f5faff;
+    color: #333;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* TOP BAR */
+  .top-bar {
+    height: 50px;
+    background: #1f3b57;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    z-index: 3;
+    position: relative;
+  }
+
+  .top-bar .gear {
+    font-size: 22px;
+    margin-right: 15px;
+    cursor: default;
+  }
+
+  .top-bar .title {
+    font-size: 18px;
+    font-weight: bold;
+  }
+
+  /* MAIN LAYOUT */
+  .layout {
+    display: grid;
+    grid-template-columns: 60% 40%;
+    height: calc(100vh - 50px);
+  }
+
+  /* LEFT SIDE */
+  .left-panel {
+    background: white;
+    padding: 8px 25px 20px 25px;
+    box-shadow: 4px 0 20px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 2;
+  }
+
+  .left-panel h1 {
+    font-size: 20px;
+    margin-bottom: 4px;
+  }
+
+  .wheel-container {
+    width: 90%;
+    height: 75%;
+    overflow-y: scroll;
+    scroll-snap-type: y mandatory;
+    perspective: 1200px;
+    border-radius: 12px;
+    background: #eef6ff;
+    padding: 12px;
+    box-shadow: -4px 0 12px rgba(0,0,0,0.12), 4px 0 12px rgba(0,0,0,0.12);
+  }
+
+  .wheel-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .wheel-item {
+    height: 45px;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    scroll-snap-align: center;
+    transition: transform 0.2s, opacity 0.2s, background 0.2s, color 0.2s;
+    transform-origin: center;
+    cursor: pointer;
+    border-radius: 8px;
+    margin: 2px 0;
+    transform: rotateX(var(--tilt, 0deg)) translateZ(var(--depth, 0px));
+    opacity: var(--opacity, 1);
+  }
+
+  .wheel-item.active {
+    font-weight: bold;
+    color: #007bff !important;
+    background: #dcecff;
+    transform: scale(1.12);
+  }
+
+  /* RIGHT SIDE */
+  .right-panel {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+  }
+
+  .info-box,
+  .info-box-small {
+    background: #e9f3ff;
+    padding: 12px 15px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+  }
+
+  .info-box {
+    opacity: 0;
+    transform: translateY(10px);
+    animation: fadeIn 0.4s forwards;
+  }
+
+  @keyframes fadeIn {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .info-box h3,
+  .info-box-small h3 {
+    margin-top: 0;
+    font-size: 18px;
+    margin-bottom: 6px;
+  }
+
+  .doctor-hours {
+    font-weight: bold;
+    font-size: 20px;
+  }
+
+  ul {
+    padding-left: 20px;
+    margin-top: 5px;
+    font-size: 15px;
+  }
+
+  .summary-list {
+    max-height: 140px;
+    overflow-y: auto;
+    margin-top: 4px;
+  }
+
+  .summary-item {
+    font-size: 14px;
+    margin-bottom: 3px;
+  }
+
+  .summary-item span.label {
+    font-weight: bold;
+  }
+
+  .action-buttons {
+    margin-top: 10px;
+    display: flex;
+    gap: 10px;
+  }
+
+  .action-buttons button {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .btn-send-home {
+    background: #e74c3c;
+    color: #fff;
+  }
+
+  .btn-swap-home {
+    background: #f39c12;
+    color: #fff;
+  }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+
+  .modal {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 20px 24px;
+    min-width: 260px;
+    max-width: 360px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  }
+
+  .modal h2 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 18px;
+  }
+
+  .modal p {
+    margin: 4px 0;
+    font-size: 14px;
+  }
+
+  .modal-close {
+    margin-top: 12px;
+    text-align: right;
+  }
+
+  .modal-close button {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    background: #1f3b57;
+    color: #fff;
+    font-size: 14px;
+  }
+
+  .clickable-summary {
+    cursor: pointer;
+  }
+</style>
+</head>
+
+<body>
+
+<div class="top-bar">
+  <div class="gear">⚙</div>
+  <div class="title">HR Dashboard</div>
+</div>
+
+<div class="layout">
+
+  <!-- LEFT SIDE: TIRED DOCTORS ONLY (>8 HRS) -->
+  <div class="left-panel" id="leftPanel">
+    <h1>Tired Doctors</h1>
+
+    <div class="wheel-container">
+      <ul class="wheel-list" id="doctorList">
+        <!-- Only tired doctors (time > 8) -->
+        <li class="wheel-item">Dr. Brown</li>
+        <li class="wheel-item">Dr. Davis</li>
+        <li class="wheel-item">Dr. Nguyen</li>
+        <li class="wheel-item">Dr. Hernandez</li>
+        <li class="wheel-item">Dr. Howard</li>
+        <li class="wheel-item">Dr. Irving</li>
+        <li class="wheel-item">Dr. King</li>
+        <li class="wheel-item">Dr. Lopez</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- RIGHT SIDE -->
+  <div class="right-panel">
+    <!-- SUMMARY PANEL (ALWAYS VISIBLE) -->
+    <div id="summaryPanel">
+      <div class="info-box" style="font-size: 36px; padding: 40px;">
+        <h3 style="font-size: 28px;">All Doctors &amp; Hours</h3>
+        <div class="summary-list" id="allDoctorsList" style="font-size: 36px;"></div>
+      </div>
+
+      <div class="info-box" style="font-size: 36px; padding: 40px;">
+        <h3 style="font-size: 28px;">All Taken Appointments</h3>
+        <div class="summary-list" id="allAppointmentsList" style="font-size: 36px;"></div>
+      </div>
+    </div>
+
+    <!-- DETAIL PANEL (CHANGES WHEN A DOCTOR IS SELECTED) -->
+    <div id="detailPanel">
+      <!-- Empty on load -->
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL FOR SHIFT HOURS -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" id="shiftModal">
+    <h2 id="modalDoctorName">Doctor Shift</h2>
+    <p id="modalShiftRange"></p>
+    <p id="modalShiftHours"></p>
+    <p id="modalWorkedHours"></p>
+    <div class="modal-close">
+      <button id="closeModalBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const wheel = document.querySelector('.wheel-container');
+  const items = document.querySelectorAll('.wheel-item');
+  const leftPanel = document.getElementById('leftPanel');
+  const detailPanel = document.getElementById('detailPanel');
+  const allDoctorsList = document.getElementById('allDoctorsList');
+  const allAppointmentsList = document.getElementById('allAppointmentsList');
+
+  const modalOverlay = document.getElementById('modalOverlay');
+  const modalDoctorName = document.getElementById('modalDoctorName');
+  const modalShiftRange = document.getElementById('modalShiftRange');
+  const modalShiftHours = document.getElementById('modalShiftHours');
+  const modalWorkedHours = document.getElementById('modalWorkedHours');
+  const closeModalBtn = document.getElementById('closeModalBtn');
+
+  /* DOCTOR DATA:
+     time = hours worked today
+     shiftStart / shiftEnd = scheduled shift
+     shiftHours = total scheduled hours
+     times = [ [patient, start, end], ... ]
+  */
+  const doctorInfo = {
+    "Dr. Smith": {
+      time: 6,
+      specialty: "General Medicine",
+      shiftStart: "8:00 AM",
+      shiftEnd: "4:00 PM",
+      shiftHours: 8,
+      times: [
+        ["Alice","9:00 AM","9:30 AM"],
+        ["Bob","11:30 AM","12:00 PM"],
+        ["Carol","2:00 PM","2:30 PM"]
+      ]
+    },
+    "Dr. Johnson": {
+      time: 4,
+      specialty: "Cardiology",
+      shiftStart: "10:00 AM",
+      shiftEnd: "6:00 PM",
+      shiftHours: 8,
+      times: [
+        ["David","10:00 AM","10:30 AM"],
+        ["Emma","1:00 PM","1:30 PM"]
+      ]
+    },
+    "Dr. Patel": {
+      time: 7,
+      specialty: "Neurology",
+      shiftStart: "7:00 AM",
+      shiftEnd: "3:00 PM",
+      shiftHours: 8,
+      times: [
+        ["Frank","8:30 AM","9:00 AM"]
+      ]
+    },
+    "Dr. Lee": {
+      time: 2,
+      specialty: "Pediatrics",
+      shiftStart: "9:00 AM",
+      shiftEnd: "5:00 PM",
+      shiftHours: 8,
+      times: [
+        ["Grace","9:15 AM","9:45 AM"],
+        ["Henry","3:45 PM","4:15 PM"],
+        ["Ivy","4:30 PM","5:00 PM"]
+      ]
+    },
+    "Dr. Garcia": {
+      time: 5,
+      specialty: "Orthopedics",
+      shiftStart: "8:00 AM",
+      shiftEnd: "4:00 PM",
+      shiftHours: 8,
+      times: [
+        ["Jack","12:00 PM","12:30 PM"],
+        ["Karen","1:30 PM","2:00 PM"]
+      ]
+    },
+    "Dr. Brown": {
+      time: 9,
+      specialty: "Dermatology",
+      shiftStart: "10:00 AM",
+      shiftEnd: "8:00 PM",
+      shiftHours: 10,
+      times: [
+        ["Leo","2:00 PM","2:30 PM"]
+      ]
+    },
+    "Dr. Wilson": {
+      time: 3,
+      specialty: "Family Medicine",
+      shiftStart: "7:00 AM",
+      shiftEnd: "3:00 PM",
+      shiftHours: 8,
+      times: [
+        ["Mia","8:00 AM","8:30 AM"],
+        ["Noah","9:45 AM","10:15 AM"],
+        ["Olivia","11:00 AM","11:30 AM"]
+      ]
+    },
+    "Dr. Martinez": {
+      time: 8,
+      specialty: "Gastroenterology",
+      shiftStart: "9:00 AM",
+      shiftEnd: "5:00 PM",
+      shiftHours: 8,
+      times: [
+        ["Paul","3:00 PM","3:30 PM"]
+      ]
+    },
+    "Dr. Davis": {
+      time: 10,
+      specialty: "Endocrinology",
+      shiftStart: "7:00 AM",
+      shiftEnd: "5:00 PM",
+      shiftHours: 10,
+      times: []
+    },
+    "Dr. Thompson": {
+      time: 1,
+      specialty: "Pulmonology",
+      shiftStart: "10:00 AM",
+      shiftEnd: "6:00 PM",
+      shiftHours: 8,
+      times: [
+        ["Quinn","10:30 AM","11:00 AM"],
+        ["Rita","11:00 AM","11:30 AM"],
+        ["Sam","1:45 PM","2:15 PM"]
+      ]
+    },
+    "Dr. Nguyen": {
+      time: 11,
+      specialty: "Oncology",
+      shiftStart: "7:00 AM",
+      shiftEnd: "6:00 PM",
+      shiftHours: 11,
+      times: []
+    },
+    "Dr. Hernandez": {
+      time: 12,
+      specialty: "Rheumatology",
+      shiftStart: "6:00 AM",
+      shiftEnd: "6:00 PM",
+      shiftHours: 12,
+      times: [
+        ["Tom","4:00 PM","4:30 PM"]
+      ]
+    },
+    "Dr. Adams": {
+      time: 5,
+      specialty: "Urology",
+      shiftStart: "9:00 AM",
+      shiftEnd: "5:00 PM",
+      shiftHours: 8,
+      times: [
+        ["Uma","9:00 AM","9:30 AM"],
+        ["Victor","3:00 PM","3:30 PM"]
+      ]
+    },
+    "Dr. Brooks": {
+      time: 7,
+      specialty: "Nephrology",
+      shiftStart: "8:00 AM",
+      shiftEnd: "4:00 PM",
+      shiftHours: 8,
+      times: [
+        ["Wendy","8:00 AM","8:30 AM"]
+      ]
+    },
+    "Dr. Diaz": {
+      time: 6,
+      specialty: "Hematology",
+      shiftStart: "10:00 AM",
+      shiftEnd: "6:00 PM",
+      shiftHours: 8,
+      times: [
+        ["Xavier","11:00 AM","11:30 AM"]
+      ]
+    },
+    "Dr. Evans": {
+      time: 3,
+      specialty: "Allergy & Immunology",
+      shiftStart: "9:00 AM",
+      shiftEnd: "5:00 PM",
+      shiftHours: 8,
+      times: [
+        ["Yara","9:30 AM","10:00 AM"],
+        ["Zane","2:30 PM","3:00 PM"]
+      ]
+    },
+    "Dr. Foster": {
+      time: 8,
+      specialty: "Radiology",
+      shiftStart: "12:00 PM",
+      shiftEnd: "8:00 PM",
+      shiftHours: 8,
+      times: [
+        ["Amy","1:00 PM","1:30 PM"]
+      ]
+    },
+    "Dr. Green": {
+      time: 2,
+      specialty: "Psychiatry",
+      shiftStart: "10:00 AM",
+      shiftEnd: "6:00 PM",
+      shiftHours: 8,
+      times: [
+        ["Ben","3:15 PM","3:45 PM"]
+      ]
+    },
+    "Dr. Howard": {
+      time: 9,
+      specialty: "Surgery",
+      shiftStart: "6:00 AM",
+      shiftEnd: "4:00 PM",
+      shiftHours: 10,
+      times: [
+        ["Cara","7:00 AM","8:00 AM"],
+        ["Dan","12:00 PM","1:00 PM"]
+      ]
+    },
+    "Dr. Irving": {
+      time: 10,
+      specialty: "Pathology",
+      shiftStart: "8:00 AM",
+      shiftEnd: "6:00 PM",
+      shiftHours: 10,
+      times: []
+    },
+    "Dr. James": {
+      time: 1,
+      specialty: "Ophthalmology",
+      shiftStart: "9:00 AM",
+      shiftEnd: "5:00 PM",
+      shiftHours: 8,
+      times: [
+        ["Ella","11:45 AM","12:15 PM"]
+      ]
+    },
+    "Dr. King": {
+      time: 11,
+      specialty: "Infectious Disease",
+      shiftStart: "7:00 AM",
+      shiftEnd: "6:00 PM",
+      shiftHours: 11,
+      times: []
+    },
+    "Dr. Lopez": {
+      time: 12,
+      specialty: "Endocrinology",
+      shiftStart: "6:00 AM",
+      shiftEnd: "6:00 PM",
+      shiftHours: 12,
+      times: [
+        ["Finn","4:30 PM","5:00 PM"]
+      ]
+    }
+  };
+
+  function colorHours(hours) {
+    const intensity = Math.min(hours / 12, 1);
+    const red = Math.floor(255 * intensity);
+    const green = Math.floor(255 * (1 - intensity));
+    return `rgb(${red}, ${green}, 0)`;
+  }
+
+  /* DETAIL PANEL FOR SELECTED DOCTOR (LEFT LIST) */
+  function showDetailForDoctor(name) {
+    const info = doctorInfo[name];
+    if (!info) return;
+
+    const appointments = info.times.length
+      ? info.times.map(t => `<li>${t[0]} — ${t[1]} to ${t[2]}</li>`).join("")
+      : "<li>No filled appointments</li>";
+
+    const hasAppointments = info.times.length > 0;
+
+    const actionButtonHtml = hasAppointments
+      ? `<button class="btn-swap-home" data-doctor="${name}">Swap and send home</button>`
+      : `<button class="btn-send-home" data-doctor="${name}">Send home</button>`;
+
+    detailPanel.innerHTML = `
+      <div class="info-box">
+        <h3>Time Worked Today</h3>
+        <p class="doctor-hours" style="color:${colorHours(info.time)};">
+          ${info.time} hrs
+        </p>
+        <div class="action-buttons">
+          ${actionButtonHtml}
+        </div>
+      </div>
+
+      <div class="info-box">
+        <h3>${name}'s Appointments</h3>
+        <ul>${appointments}</ul>
+      </div>
+    `;
+
+    const btn = detailPanel.querySelector('.btn-send-home, .btn-swap-home');
+    if (btn) {
+      btn.addEventListener('click', () => {
+        if (btn.classList.contains('btn-send-home')) {
+          alert(`${name} has been sent home (no appointments).`);
+        } else {
+          alert(`${name}'s appointments will be swapped with a non-tired doctor and they will be sent home.`);
+        }
+      });
+    }
+  }
+
+  function hideDetailPanel() {
+    detailPanel.innerHTML = "";
+  }
+
+  /* SUMMARY: ALL DOCTORS & HOURS */
+  function buildAllDoctorsSummary() {
+    const entries = Object.keys(doctorInfo).sort();
+    allDoctorsList.innerHTML = entries.map(name => {
+      const info = doctorInfo[name];
+      return `
+        <div class="summary-item clickable-summary" data-doctor="${name}" style="color:${colorHours(info.time)};">
+          <span class="label">${name}</span> — ${info.time} hrs
+        </div>
+      `;
+    }).join("");
+
+    allDoctorsList.querySelectorAll('.clickable-summary').forEach(el => {
+      el.addEventListener('click', () => {
+        const name = el.getAttribute('data-doctor');
+        openShiftModal(name);
+      });
+    });
+  }
+
+  /* SUMMARY: ALL APPOINTMENTS */
+  function buildAllAppointmentsSummary() {
+    const rows = [];
+    Object.keys(doctorInfo).forEach(name => {
+      const info = doctorInfo[name];
+      info.times.forEach(t => {
+        rows.push({
+          doctor: name,
+          patient: t[0],
+          start: t[1],
+          end: t[2]
+        });
+      });
+    });
+
+    allAppointmentsList.innerHTML = rows.length
+      ? rows.map(r => `
+          <div class="summary-item">
+            <span class="label">${r.patient}</span> — ${r.start} to ${r.end} (${r.doctor})
+          </div>
+        `).join("")
+      : "<div class='summary-item'>No taken appointments</div>";
+  }
+
+  /* MODAL: SHIFT HOURS */
+  function openShiftModal(name) {
+    const info = doctorInfo[name];
+    if (!info) return;
+
+    modalDoctorName.textContent = name + " — Shift Details";
+    modalShiftRange.textContent = `Shift: ${info.shiftStart} to ${info.shiftEnd}`;
+    modalShiftHours.textContent = `Scheduled shift length: ${info.shiftHours} hours`;
+    modalWorkedHours.textContent = `Hours worked today: ${info.time} hours`;
+    modalOverlay.style.display = "flex";
+  }
+
+  function closeShiftModal() {
+    modalOverlay.style.display = "none";
+  }
+
+  closeModalBtn.addEventListener('click', closeShiftModal);
+  modalOverlay.addEventListener('click', (e) => {
+    if (e.target === modalOverlay) {
+      closeShiftModal();
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeShiftModal();
+  });
+
+  /* SCROLL WHEEL BEHAVIOR */
+  function updateWheel() {
+    const center = wheel.scrollTop + wheel.clientHeight / 2;
+
+    items.forEach(item => {
+      const name = item.textContent;
+      const info = doctorInfo[name];
+      if (!info) return;
+
+      item.style.color = colorHours(info.time);
+
+      const itemCenter = item.offsetTop + item.clientHeight / 2;
+      const distance = Math.abs(center - itemCenter);
+
+      const maxDistance = 200;
+      const ratio = Math.min(distance / maxDistance, 1);
+
+      item.style.setProperty('--tilt', `${ratio * 25}deg`);
+      item.style.setProperty('--depth', `${-ratio * 60}px`);
+      item.style.setProperty('--opacity', 1 - ratio * 0.6);
+    });
+  }
+
+  wheel.addEventListener('scroll', updateWheel);
+
+  /* LEFT LIST CLICK: DETAIL + MODAL OPTION */
+  items.forEach(item => {
+    item.addEventListener('click', () => {
+      items.forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+      const name = item.textContent;
+      showDetailForDoctor(name);
+    });
+
+    item.addEventListener('dblclick', () => {
+      const name = item.textContent;
+      openShiftModal(name);
+    });
+  });
+
+  /* CLICK OFF LEFT PANEL: HIDE DETAIL PANEL */
+  document.addEventListener('click', (e) => {
+    const clickedInsideLeft = leftPanel.contains(e.target);
+    const clickedInsideDetail = detailPanel.contains(e.target);
+    const clickedModal = modalOverlay.contains(e.target);
+    if (!clickedInsideLeft && !clickedInsideDetail && !clickedModal) {
+      hideDetailPanel();
+      items.forEach(i => i.classList.remove('active'));
+    }
+  });
+
+  /* INITIAL BUILD */
+  updateWheel();
+  buildAllDoctorsSummary();
+  buildAllAppointmentsSummary();
+</script>
+
+</body>
+</html>
